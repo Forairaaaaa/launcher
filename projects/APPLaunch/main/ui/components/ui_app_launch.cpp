@@ -19,6 +19,7 @@
 #include "ui_app_console.hpp"
 #include "ui_app_IpPanel.hpp"
 #include "ui_app_stock.hpp"
+#include "ui_app_tank_battle.hpp"
 
 // 前向声明
 class app_launch_S;
@@ -95,7 +96,7 @@ public:
                               "A:/dist/images/MUSIC_logo.png", page_v<UIMusicPage>);
         app_list.emplace_back("AUDIO_PLAYER",
                               "A:/dist/images/MUSIC_logo.png",
-                              "tinyplay -D1 -d0 /home/pi/zhou.wav",
+                              "tinyplay -D1 -d0 /home/pi/Love_Circulation48k.wav",
                               true);
         app_list.emplace_back("IP_PANEL",
                               "A:/dist/images/ssh.png", page_v<UIIpPanelPage>);
@@ -107,6 +108,9 @@ public:
 
         app_list.emplace_back("STOCKS",
                               "A:/dist/images/stocks_macos_bigsur_icon_189691.png", page_v<UIStockPage>);
+
+        app_list.emplace_back("TANK",
+                      "A:/dist/images/CLAW_logo.png", page_v<UITankBattlePage>);
 
 
 
