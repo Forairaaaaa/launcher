@@ -6,6 +6,7 @@
 #include <functional>
 #include <cstdlib>   // rand()
 
+
 // ============================================================
 //  股票界面  UIStockPage
 //  屏幕分辨率: 320 x 170  (顶栏20px, ui_APP_Container 320x150)
@@ -22,6 +23,8 @@
 class UIStockPage : public app_base
 {
     enum class ViewState { MAIN, SUB };
+
+    static constexpr uint32_t TOGGLE_KEY_CODE = 15;
 
     struct StockItem
     {
@@ -58,6 +61,15 @@ private:
     ViewState view_state_ = ViewState::MAIN;
     lv_timer_t *sim_timer_ = nullptr;  // 【新增】1秒定时器
 
+    float sensor_temperature_ = 24.6f;
+    float sensor_pressure_ = 1008.4f;
+    float sensor_humidity_ = 46.2f;
+    float sensor_iaq_ = 58.0f;
+    float sensor_co2eq_ = 672.0f;
+    float sensor_voc_ = 0.62f;
+    std::vector<float> sensor_curve_raw_;
+    std::vector<lv_point_precise_t> sensor_curve_pts_;
+
     static constexpr int ITEM_H       = 28;
     static constexpr int VISIBLE_ROWS = 4;
     static constexpr int LIST_Y       = 22;
@@ -66,6 +78,11 @@ private:
     static constexpr int SPARK_Y      = 4;
     static constexpr int SPARK_W      = 120;
     static constexpr int SPARK_H      = 20;
+
+    static constexpr int SENSOR_CURVE_X = 12;
+    static constexpr int SENSOR_CURVE_Y = 84;
+    static constexpr int SENSOR_CURVE_W = 296;
+    static constexpr int SENSOR_CURVE_H = 54;
 
     // ==================== 股票数据初始化 ====================
     void stock_init()
@@ -85,6 +102,20 @@ private:
         // 预计算折线坐标
         for (auto &stock : stock_items_)
             recalc_sparkline(stock);
+
+        sensor_curve_raw_ = {
+            sensor_iaq_ - 4.2f,
+            sensor_iaq_ - 3.1f,
+            sensor_iaq_ - 2.2f,
+            sensor_iaq_ - 1.4f,
+            sensor_iaq_ - 0.6f,
+            sensor_iaq_ + 0.4f,
+            sensor_iaq_ + 1.1f,
+            sensor_iaq_ + 1.8f,
+            sensor_iaq_ + 0.7f,
+            sensor_iaq_
+        };
+        recalc_sensor_curve();
     }
 
     // 【新增】重新计算单只股票的折线图 LVGL 坐标
@@ -104,9 +135,9 @@ private:
 
         stock.sparkline_pts.resize(cnt);
         for (int i = 0; i < cnt; ++i) {
-            float x = (float)(SPARK_X + (i * (SPARK_W - 1)) / (cnt - 1));
+            lv_value_precise_t x = (lv_value_precise_t)(SPARK_X + (i * (SPARK_W - 1)) / (cnt - 1));
             float t = (raw[i] - min_v) / range;
-            float y = (float)(SPARK_Y + SPARK_H - 1 - t * (SPARK_H - 1));
+            lv_value_precise_t y = (lv_value_precise_t)(SPARK_Y + SPARK_H - 1 - t * (SPARK_H - 1));
             stock.sparkline_pts[i] = {x, y};
         }
     }
@@ -138,8 +169,61 @@ private:
 
             recalc_sparkline(stock);
         }
+
+        simulate_sensor_tick();
+
         // 刷新界面
         build_stock_rows();
+        refresh_sensor_view();
+    }
+
+    static float clampf(float value, float min_v, float max_v)
+    {
+        if (value < min_v) return min_v;
+        if (value > max_v) return max_v;
+        return value;
+    }
+
+    void simulate_sensor_tick()
+    {
+        sensor_temperature_ = clampf(sensor_temperature_ + ((rand() % 41) - 20) * 0.03f, 18.0f, 35.0f);
+        sensor_pressure_ = clampf(sensor_pressure_ + ((rand() % 31) - 15) * 0.10f, 980.0f, 1040.0f);
+        sensor_humidity_ = clampf(sensor_humidity_ + ((rand() % 31) - 15) * 0.15f, 20.0f, 85.0f);
+
+        float iaq_step = ((rand() % 41) - 20) * 0.35f;
+        sensor_iaq_ = clampf(sensor_iaq_ + iaq_step, 5.0f, 350.0f);
+
+        sensor_co2eq_ = clampf(sensor_co2eq_ + iaq_step * 8.5f, 400.0f, 2600.0f);
+        sensor_voc_ = clampf(sensor_voc_ + ((rand() % 31) - 15) * 0.01f, 0.05f, 4.0f);
+
+        if (!sensor_curve_raw_.empty()) {
+            sensor_curve_raw_.erase(sensor_curve_raw_.begin());
+        }
+        sensor_curve_raw_.push_back(sensor_iaq_);
+        recalc_sensor_curve();
+    }
+
+    void recalc_sensor_curve()
+    {
+        int cnt = (int)sensor_curve_raw_.size();
+        if (cnt < 2) return;
+
+        float min_v = sensor_curve_raw_[0];
+        float max_v = sensor_curve_raw_[0];
+        for (float v : sensor_curve_raw_) {
+            if (v < min_v) min_v = v;
+            if (v > max_v) max_v = v;
+        }
+        float range = max_v - min_v;
+        if (range < 0.001f) range = 1.0f;
+
+        sensor_curve_pts_.resize(cnt);
+        for (int i = 0; i < cnt; ++i) {
+            lv_value_precise_t x = (lv_value_precise_t)(SENSOR_CURVE_X + (i * (SENSOR_CURVE_W - 1)) / (cnt - 1));
+            float t = (sensor_curve_raw_[i] - min_v) / range;
+            lv_value_precise_t y = (lv_value_precise_t)(SENSOR_CURVE_Y + SENSOR_CURVE_H - 1 - t * (SENSOR_CURVE_H - 1));
+            sensor_curve_pts_[i] = {x, y};
+        }
     }
 
     // ==================== UI 构建（主视图） ====================
@@ -174,7 +258,7 @@ private:
         lv_obj_set_style_text_font(lbl_title, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
         lv_obj_t *lbl_hint = lv_label_create(title_bar);
-        lv_label_set_text(lbl_hint, "UP/DN:select  ESC:back");
+        lv_label_set_text(lbl_hint, "TAB(15):switch  ESC:back");
         lv_obj_set_align(lbl_hint, LV_ALIGN_RIGHT_MID);
         lv_obj_set_x(lbl_hint, -4);
         lv_obj_set_style_text_color(lbl_hint, lv_color_hex(0x7EA8D8), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -191,7 +275,143 @@ private:
         lv_obj_clear_flag(list_cont, LV_OBJ_FLAG_SCROLLABLE);
         ui_obj_["list_cont"] = list_cont;
 
+        lv_obj_t *sensor_cont = lv_obj_create(bg);
+        lv_obj_set_size(sensor_cont, 320, LIST_H);
+        lv_obj_set_pos(sensor_cont, 0, LIST_Y);
+        lv_obj_set_style_radius(sensor_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(sensor_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(sensor_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_all(sensor_cont, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(sensor_cont, LV_OBJ_FLAG_SCROLLABLE);
+        ui_obj_["sensor_cont"] = sensor_cont;
+
         build_stock_rows();
+        build_sensor_view();
+        update_view_visibility();
+    }
+
+    void update_view_visibility()
+    {
+        lv_obj_t *list_cont = ui_obj_["list_cont"];
+        lv_obj_t *sensor_cont = ui_obj_["sensor_cont"];
+        if (!list_cont || !sensor_cont) return;
+
+        if (view_state_ == ViewState::MAIN) {
+            lv_obj_clear_flag(list_cont, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(sensor_cont, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(list_cont, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_clear_flag(sensor_cont, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    void build_sensor_view()
+    {
+        lv_obj_t *sensor_cont = ui_obj_["sensor_cont"];
+        if (!sensor_cont) return;
+
+        lv_obj_t *grid = lv_obj_create(sensor_cont);
+        lv_obj_set_size(grid, 312, 76);
+        lv_obj_set_pos(grid, 4, 2);
+        lv_obj_set_style_radius(grid, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(grid, lv_color_hex(0x161B22), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(grid, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(grid, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(grid, lv_color_hex(0x30363D), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_all(grid, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+
+        const char *names[6] = {
+            "Temperature",
+            "Pressure",
+            "Humidity",
+            "IAQ",
+            "CO2 Equivalent",
+            "Breath VOC Eq"
+        };
+
+        const int cell_w = 102;
+        const int cell_h = 36;
+        for (int i = 0; i < 6; ++i) {
+            int col = i % 3;
+            int row = i / 3;
+            int x = col * cell_w + 2;
+            int y = row * cell_h + 1;
+
+            lv_obj_t *label_name = lv_label_create(grid);
+            lv_label_set_text(label_name, names[i]);
+            lv_obj_set_pos(label_name, x, y);
+            lv_obj_set_style_text_color(label_name, lv_color_hex(0x7D8590), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(label_name, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+            lv_obj_t *label_val = lv_label_create(grid);
+            lv_obj_set_pos(label_val, x, y + 14);
+            lv_obj_set_style_text_color(label_val, lv_color_hex(0xE6EDF3), LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(label_val, &lv_font_montserrat_12, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+            switch (i) {
+            case 0: ui_obj_["sensor_temperature"] = label_val; break;
+            case 1: ui_obj_["sensor_pressure"] = label_val; break;
+            case 2: ui_obj_["sensor_humidity"] = label_val; break;
+            case 3: ui_obj_["sensor_iaq"] = label_val; break;
+            case 4: ui_obj_["sensor_co2eq"] = label_val; break;
+            case 5: ui_obj_["sensor_voc"] = label_val; break;
+            default: break;
+            }
+        }
+
+        lv_obj_t *curve_box = lv_obj_create(sensor_cont);
+        lv_obj_set_size(curve_box, 312, 62);
+        lv_obj_set_pos(curve_box, 4, 82);
+        lv_obj_set_style_radius(curve_box, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_color(curve_box, lv_color_hex(0x0D1117), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_bg_opa(curve_box, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(curve_box, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_color(curve_box, lv_color_hex(0x30363D), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_pad_all(curve_box, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_clear_flag(curve_box, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t *curve_title = lv_label_create(curve_box);
+        lv_label_set_text(curve_title, "IAQ Trend (simulated)");
+        lv_obj_set_pos(curve_title, 6, 2);
+        lv_obj_set_style_text_color(curve_title, lv_color_hex(0x7D8590), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(curve_title, &lv_font_montserrat_10, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+        lv_obj_t *line = lv_line_create(sensor_cont);
+        lv_obj_set_style_line_color(line, lv_color_hex(0x2ECC71), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_width(line, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_line_rounded(line, true, LV_PART_MAIN | LV_STATE_DEFAULT);
+        ui_obj_["sensor_curve"] = line;
+
+        refresh_sensor_view();
+    }
+
+    void refresh_sensor_view()
+    {
+        char buf[32];
+
+        lv_snprintf(buf, sizeof(buf), "%.2f C", (double)sensor_temperature_);
+        lv_label_set_text(ui_obj_["sensor_temperature"], buf);
+
+        lv_snprintf(buf, sizeof(buf), "%.1f hPa", (double)sensor_pressure_);
+        lv_label_set_text(ui_obj_["sensor_pressure"], buf);
+
+        lv_snprintf(buf, sizeof(buf), "%.1f %%", (double)sensor_humidity_);
+        lv_label_set_text(ui_obj_["sensor_humidity"], buf);
+
+        lv_snprintf(buf, sizeof(buf), "%.1f", (double)sensor_iaq_);
+        lv_label_set_text(ui_obj_["sensor_iaq"], buf);
+
+        lv_snprintf(buf, sizeof(buf), "%.0f ppm", (double)sensor_co2eq_);
+        lv_label_set_text(ui_obj_["sensor_co2eq"], buf);
+
+        lv_snprintf(buf, sizeof(buf), "%.2f", (double)sensor_voc_);
+        lv_label_set_text(ui_obj_["sensor_voc"], buf);
+
+        lv_obj_t *line = ui_obj_["sensor_curve"];
+        if (line && !sensor_curve_pts_.empty()) {
+            lv_line_set_points(line, sensor_curve_pts_.data(), (uint16_t)sensor_curve_pts_.size());
+        }
     }
 
     // ==================== 构建股票行 ====================
@@ -341,6 +561,17 @@ private:
     }
     void event_handler(lv_event_t *e)
     {
+        if (IS_KEY_PRESSED(e))
+        {
+            uint32_t key = LV_EVENT_KEYBOARD_GET_KEY(e);
+            if (key == TOGGLE_KEY_CODE)
+            {
+                view_state_ = (view_state_ == ViewState::MAIN) ? ViewState::SUB : ViewState::MAIN;
+                update_view_visibility();
+                return;
+            }
+        }
+
         if (IS_KEY_RELEASED(e))
         {
             uint32_t key = LV_EVENT_KEYBOARD_GET_KEY(e);
