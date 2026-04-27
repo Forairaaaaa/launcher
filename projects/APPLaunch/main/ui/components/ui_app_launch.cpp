@@ -20,6 +20,7 @@
 #include "ui_app_IpPanel.hpp"
 #include "ui_app_stock.hpp"
 #include "ui_app_tank_battle.hpp"
+#include "ui_app_racing.hpp"
 
 // 前向声明
 class app_launch_S;
@@ -111,6 +112,9 @@ public:
 
         app_list.emplace_back("TANK",
                       "A:/dist/images/CLAW_logo.png", page_v<UITankBattlePage>);
+
+        app_list.emplace_back("RACING",
+                  "A:/dist/images/gmae.png", page_v<UIRacingPage>);
 
 
 
