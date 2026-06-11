@@ -195,6 +195,9 @@ public:
         app_list.emplace_back("MATH",
                               img_path("math_100.png"),
                               "/usr/share/APPLaunch/bin/M5CardputerZero-Calculator", false);
+        if (APP_ENABLED("Rec"))
+        app_list.emplace_back("REC",
+                              img_path("rec_100.png"), page_v<UIRecPage>);
 
 #if defined(__linux__) && !defined(HAL_PLATFORM_SDL)
         if (APP_ENABLED("IP_Panel"))
@@ -220,9 +223,6 @@ public:
         if (APP_ENABLED("Mesh"))
         app_list.emplace_back("MESH",
                               img_path("mesh_100.png"), page_v<UIMeshPage>);
-        if (APP_ENABLED("Rec"))
-        app_list.emplace_back("REC",
-                              img_path("rec_100.png"), page_v<UIRecPage>);
         if (APP_ENABLED("Camera"))
         app_list.emplace_back("CAMERA",
                               img_path("camera_100.png"), page_v<UICameraPage>);
