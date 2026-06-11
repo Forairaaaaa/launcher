@@ -16,3 +16,4 @@ data
 docs/*.html
 skills-lock.json
 *.bak
+.clangd
