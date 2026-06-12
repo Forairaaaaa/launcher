@@ -5,7 +5,7 @@ with open(env['PROJECT_TOOL_S']) as f:
     exec(f.read())
 
 SRCS = Glob('src/*.c*')
-INCLUDE = [ADir('.'), ADir('include')]
+INCLUDE = [ADir('.')]
 PRIVATE_INCLUDE = []
 REQUIREMENTS = ['cp0_lvgl', 'lvgl_component', 'pthread']
 STATIC_LIB = []

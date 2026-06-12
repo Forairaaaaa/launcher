@@ -1,4 +1,4 @@
-#include "main.h"
+#include "ui/recorder.hpp"
 
 #include "lvgl/lvgl.h"
 
@@ -104,7 +104,7 @@ void build_ui()
 
 } // namespace
 
-extern "C" void ui_init(void)
+void recorder_ui_init(void)
 {
     build_ui();
 }
