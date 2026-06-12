@@ -1,3 +1,4 @@
+#include "core/recorder_app.hpp"
 #include "hal_lvgl_bsp.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -22,10 +23,14 @@ int main(int argc, char *argv[])
     spdlog::info("Recorder: display {}x{}", (int)lv_display_get_horizontal_resolution(disp),
                  (int)lv_display_get_vertical_resolution(disp));
 
+    recorder::RecorderApp app;
+    app.start();
+
     lv_obj_invalidate(lv_screen_active());
 
     while (1) {
         lv_timer_handler();
+        app.tick(lv_tick_get());
         usleep(10000);
     }
 }

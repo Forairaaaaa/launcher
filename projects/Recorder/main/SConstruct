@@ -5,8 +5,8 @@ Import('env')
 with open(env['PROJECT_TOOL_S']) as f:
     exec(f.read())
 
-SRCS = Glob('src/*.c*')
-INCLUDE = [ADir('.')]
+SRCS = append_srcs_dir([ADir('src')])
+INCLUDE = [ADir('.'), ADir('src')]
 PRIVATE_INCLUDE = []
 REQUIREMENTS = ['cp0_lvgl', 'lvgl_component', 'pthread']
 STATIC_LIB = []
