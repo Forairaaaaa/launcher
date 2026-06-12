@@ -1,9 +1,7 @@
 #include "hal_lvgl_bsp.h"
-#include "lvgl/lvgl.h"
-#include "ui/recorder.hpp"
-
 #include <stdio.h>
 #include <unistd.h>
+#include <lvgl.h>
 
 int main(int argc, char *argv[])
 {
@@ -19,11 +17,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    printf("Recorder: display %dx%d\n",
-           (int)lv_display_get_horizontal_resolution(disp),
+    printf("Recorder: display %dx%d\n", (int)lv_display_get_horizontal_resolution(disp),
            (int)lv_display_get_vertical_resolution(disp));
 
-    recorder_ui_init();
     lv_obj_invalidate(lv_screen_active());
 
     while (1) {
