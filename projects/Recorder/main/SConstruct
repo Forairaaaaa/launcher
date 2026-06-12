@@ -11,7 +11,7 @@ PRIVATE_INCLUDE = []
 REQUIREMENTS = ['cp0_lvgl', 'lvgl_component', 'pthread']
 STATIC_LIB = []
 DYNAMIC_LIB = []
-DEFINITIONS = []
+DEFINITIONS = ['-std=c++17']
 DEFINITIONS_PRIVATE = []
 LDFLAGS = []
 LINK_SEARCH_PATH = []
@@ -37,8 +37,24 @@ lvgl_component = list(
 toolchain_sysroot = os.environ.get('CONFIG_TOOLCHAIN_SYSROOT', '') or '/'
 
 if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
+    import platform
     lvgl_component['REQUIREMENTS'] += ['SDL2']
-    lvgl_component['INCLUDE'] += ['/usr/include/SDL2']
+    if platform.system() == 'Darwin':
+        # Homebrew SDL2: pkg-config gives -I.../include/SDL2, but LVGL uses
+        # #include "SDL2/SDL.h" so we need the parent dir as well.
+        sdl2_cflags = pkg_config_cflags('sdl2')
+        for flag in sdl2_cflags:
+            if flag.startswith('-I'):
+                sdl2_dir = flag[2:]
+                lvgl_component['INCLUDE'] += [os.path.dirname(sdl2_dir), sdl2_dir]
+        for flag in pkg_config_ldflags('sdl2'):
+            if flag.startswith('-L'):
+                lvgl_component['LINK_SEARCH_PATH'] += [flag[2:]]
+        if not sdl2_cflags:
+            lvgl_component['INCLUDE'] += ['/opt/homebrew/include', '/opt/homebrew/include/SDL2']
+            lvgl_component['LINK_SEARCH_PATH'] += ['/opt/homebrew/lib']
+    else:
+        lvgl_component['INCLUDE'] += ['/usr/include/SDL2']
     lvgl_component['DEFINITIONS'] += ['-D_REENTRANT']
 
 if 'CONFIG_V9_5_LV_USE_FREETYPE' in os.environ:
