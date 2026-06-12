@@ -15,25 +15,25 @@ void RecordingViewModel::onEnter()
 void RecordingViewModel::onKey(uint32_t key)
 {
     switch (key) {
-    case '5':
-        if (_model.state().get() == RecordingState::Recording) {
-            _model.pause();
-        } else if (_model.state().get() == RecordingState::Paused) {
-            _model.resume();
-        }
-        break;
-    case '6':
-        if (_model.state().get() == RecordingState::Idle) {
-            _model.start();
-        } else {
-            _model.stop();
-        }
-        break;
-    case '8':
-        _router.push(PageId::Files);
-        break;
-    default:
-        break;
+        case '5':
+            if (_model.state().get() == RecordingState::Recording) {
+                _model.pause();
+            } else if (_model.state().get() == RecordingState::Paused) {
+                _model.resume();
+            }
+            break;
+        case '6':
+            if (_model.state().get() == RecordingState::Idle) {
+                _model.start();
+            } else {
+                _model.stop();
+            }
+            break;
+        case '8':
+            _router.push(PageId::Files);
+            break;
+        default:
+            break;
     }
 }
 
@@ -42,4 +42,4 @@ void RecordingViewModel::tick(uint32_t nowMs)
     _model.tick(nowMs);
 }
 
-} // namespace recorder
+}  // namespace recorder

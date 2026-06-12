@@ -2,11 +2,15 @@
 
 #include "core/recorder_types.hpp"
 #include <tools/observable/observable.hpp>
+#include <memory>
 
 namespace recorder {
 
 class RecordingModel {
 public:
+    RecordingModel();
+    ~RecordingModel();
+
     smooth_ui_toolkit::Observable<RecordingState>& state()
     {
         return _state;
@@ -29,9 +33,12 @@ public:
     void tick(uint32_t nowMs);
 
 private:
-    smooth_ui_toolkit::Observable<RecordingState> _state {RecordingState::Idle};
-    smooth_ui_toolkit::Observable<float> _mic_amp {0.0f};
-    smooth_ui_toolkit::Observable<AudioFrame> _frame {AudioFrame {}};
+    struct Impl;
+
+    smooth_ui_toolkit::Observable<RecordingState> _state{RecordingState::Idle};
+    smooth_ui_toolkit::Observable<float> _mic_amp{0.0f};
+    smooth_ui_toolkit::Observable<AudioFrame> _frame{AudioFrame{}};
+    std::unique_ptr<Impl> _impl;
 };
 
-} // namespace recorder
+}  // namespace recorder

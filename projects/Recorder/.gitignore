@@ -2,3 +2,4 @@ build/
 dist/
 dependencies/
 __pycache__
+recordings/

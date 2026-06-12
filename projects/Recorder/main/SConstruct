@@ -8,7 +8,7 @@ with open(env['PROJECT_TOOL_S']) as f:
 SRCS = append_srcs_dir([ADir('src')])
 INCLUDE = [ADir('.'), ADir('src')]
 PRIVATE_INCLUDE = []
-REQUIREMENTS = ['cp0_lvgl', 'lvgl_component', 'pthread']
+REQUIREMENTS = ['cp0_lvgl', 'lvgl_component', 'pthread', 'Miniaudio']
 STATIC_LIB = []
 DYNAMIC_LIB = []
 DEFINITIONS = ['-std=c++17']
@@ -38,6 +38,7 @@ toolchain_sysroot = os.environ.get('CONFIG_TOOLCHAIN_SYSROOT', '') or '/'
 
 if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
     import platform
+    DEFINITIONS += ['-DRECORDER_USE_DEFAULT_AUDIO_BACKEND=1']
     lvgl_component['REQUIREMENTS'] += ['SDL2']
     if platform.system() == 'Darwin':
         # Homebrew SDL2: pkg-config gives -I.../include/SDL2, but LVGL uses
@@ -56,6 +57,8 @@ if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
     else:
         lvgl_component['INCLUDE'] += ['/usr/include/SDL2']
     lvgl_component['DEFINITIONS'] += ['-D_REENTRANT']
+else:
+    DEFINITIONS += ['-DRECORDER_USE_PULSEAUDIO=1']
 
 if 'CONFIG_V9_5_LV_USE_FREETYPE' in os.environ:
     lvgl_component['REQUIREMENTS'] += ['freetype']

@@ -20,13 +20,13 @@ lv_event_code_t keyboardEventCode()
 #endif
 }
 
-} // namespace
+}  // namespace
 
 RecorderApp::RecorderApp()
     : _recording_vm(_router, _recording_model),
       _files_vm(_router, _files_model, _playback_model),
       _playback_vm(_router, _playback_model),
-      _view_models {&_recording_vm, &_files_vm, &_playback_vm}
+      _view_models{&_recording_vm, &_files_vm, &_playback_vm}
 {
 }
 
@@ -94,8 +94,12 @@ void RecorderApp::onRouteChanged(void* context, const PageId& page)
 void RecorderApp::onKeyboardEvent(lv_event_t* event)
 {
     auto* self = static_cast<RecorderApp*>(lv_event_get_user_data(event));
-    auto* key = static_cast<cp0_key_event_t*>(lv_event_get_param(event));
+    auto* key  = static_cast<cp0_key_event_t*>(lv_event_get_param(event));
     if (!self || !key) {
+        return;
+    }
+
+    if (key->key_state != LV_INDEV_STATE_PRESSED) {
         return;
     }
 
@@ -104,4 +108,4 @@ void RecorderApp::onKeyboardEvent(lv_event_t* event)
     }
 }
 
-} // namespace recorder
+}  // namespace recorder
