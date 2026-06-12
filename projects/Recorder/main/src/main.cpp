@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <lvgl.h>
+#include <smooth_lvgl.hpp>
+#include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[])
 {
@@ -17,8 +19,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    printf("Recorder: display %dx%d\n", (int)lv_display_get_horizontal_resolution(disp),
-           (int)lv_display_get_vertical_resolution(disp));
+    spdlog::info("Recorder: display {}x{}", (int)lv_display_get_horizontal_resolution(disp),
+                 (int)lv_display_get_vertical_resolution(disp));
 
     lv_obj_invalidate(lv_screen_active());
 

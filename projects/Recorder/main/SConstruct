@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 Import('env')
 with open(env['PROJECT_TOOL_S']) as f:
@@ -15,6 +16,21 @@ DEFINITIONS_PRIVATE = []
 LDFLAGS = []
 LINK_SEARCH_PATH = []
 STATIC_FILES = []
+
+PROJECT_ROOT = Path(env['PROJECT_PATH'])
+DEPENDENCIES = PROJECT_ROOT / 'dependencies'
+SPDLOG = DEPENDENCIES / 'spdlog'
+SMOOTH_UI_TOOLKIT = DEPENDENCIES / 'smooth_ui_toolkit'
+
+if SPDLOG.exists():
+    INCLUDE += [str(SPDLOG / 'include')]
+
+if SMOOTH_UI_TOOLKIT.exists():
+    INCLUDE += [
+        str(SMOOTH_UI_TOOLKIT / 'src'),
+        str(SMOOTH_UI_TOOLKIT / 'src' / 'lvgl'),
+    ]
+    SRCS += append_srcs_dir([str(SMOOTH_UI_TOOLKIT / 'src')])
 
 lvgl_component = list(
     filter(lambda x: x['target'] == 'lvgl_component', env['COMPONENTS']))[0]

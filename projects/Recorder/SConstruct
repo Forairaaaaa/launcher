@@ -1,5 +1,5 @@
 from pathlib import Path
-import os
+import os, sys
 
 """
 Build examples:
@@ -13,6 +13,11 @@ version = "v0.0.4"
 local_path = Path(os.getcwd())
 sdk_path = local_path.parent.parent / "SDK"
 static_lib_path = os.path.join(sdk_path, "github_source", f"static_lib_{version}")
+
+sys.path.insert(0, str(local_path))
+from fetch_repos import ensure_dependencies
+
+ensure_dependencies()
 
 if "cross" in os.environ.get("CONFIG_DEFAULT_FILE", ""):
     cross_package_enabled = True
