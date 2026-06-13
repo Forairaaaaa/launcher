@@ -4,3 +4,4 @@ dependencies/
 __pycache__
 recordings/
 .DS_Store
+main/src/assets/res_c/image_*.c
