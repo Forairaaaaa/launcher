@@ -13,6 +13,12 @@ enum class RecordingWaveformType {
     Spectrum,
 };
 
+enum class PendingRecordingCloseAction {
+    None,
+    Confirm,
+    Discard,
+};
+
 class RecordingViewModel : public ViewModel {
 public:
     RecordingViewModel(RecorderRouter& router, RecordingModel& model);
@@ -61,6 +67,11 @@ public:
         return _waveform_type;
     }
 
+    smooth_ui_toolkit::Observable<PendingRecordingCloseAction>& pendingRecordingCloseAction()
+    {
+        return _pending_recording_close_action;
+    }
+
     void setPendingRecordingName(std::string name);
     bool confirmPendingRecording();
     bool discardPendingRecording();
@@ -69,6 +80,8 @@ private:
     RecordingModel& _model;
     smooth_ui_toolkit::Observable<RecordingWaveformType> _waveform_type{RecordingWaveformType::Basic};
     smooth_ui_toolkit::Observable<std::string> _pending_recording_name{""};
+    smooth_ui_toolkit::Observable<PendingRecordingCloseAction> _pending_recording_close_action{
+        PendingRecordingCloseAction::None};
     bool _pending_recording_active = false;
 
     void syncPendingRecordingName();

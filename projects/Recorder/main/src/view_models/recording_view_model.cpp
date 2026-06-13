@@ -107,6 +107,7 @@ void RecordingViewModel::setPendingRecordingName(std::string name)
 
 bool RecordingViewModel::confirmPendingRecording()
 {
+    _pending_recording_close_action.set(PendingRecordingCloseAction::Confirm);
     const bool ok = _model.confirmPendingRecording(_pending_recording_name.get());
     if (ok) {
         syncPendingRecordingName();
@@ -116,6 +117,7 @@ bool RecordingViewModel::confirmPendingRecording()
 
 bool RecordingViewModel::discardPendingRecording()
 {
+    _pending_recording_close_action.set(PendingRecordingCloseAction::Discard);
     const bool ok = _model.discardPendingRecording();
     if (ok) {
         syncPendingRecordingName();
@@ -131,6 +133,9 @@ void RecordingViewModel::syncPendingRecordingName()
     }
 
     _pending_recording_active = pending.active;
+    if (pending.active) {
+        _pending_recording_close_action.set(PendingRecordingCloseAction::None);
+    }
     _pending_recording_name.set(pending.active ? pending.name : "");
 }
 

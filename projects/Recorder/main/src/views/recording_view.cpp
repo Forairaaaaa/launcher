@@ -88,7 +88,7 @@ constexpr int32_t kFileDialogRadius              = 14;
 constexpr int32_t kFileNameAreaWidth             = 238;
 constexpr int32_t kFileNameAreaHeight            = 28;
 constexpr int32_t kFileNameAreaRadius            = 5;
-constexpr int32_t kFileButtonWidth               = 87;
+constexpr int32_t kFileButtonWidth               = 96;
 constexpr int32_t kFileButtonHeight              = 23;
 constexpr int32_t kFileButtonRadius              = 5;
 constexpr int32_t kFilePromptCenterX             = 0;
@@ -96,10 +96,10 @@ constexpr int32_t kFilePromptCenterY             = -32;
 constexpr int32_t kFileNameAreaCenterX           = 0;
 constexpr int32_t kFileNameAreaCenterY           = -2;
 constexpr int32_t kFileButtonCenterY             = 28;
-constexpr int32_t kFileDiscardButtonCenterX      = -21;
-constexpr int32_t kFileConfirmButtonCenterX      = 76;
+constexpr int32_t kFileDiscardButtonCenterX      = -33;
+constexpr int32_t kFileConfirmButtonCenterX      = 71;
 constexpr int32_t kFileDialogOpenOriginX         = 0;
-constexpr int32_t kFileDialogOpenOriginY         = -120;
+constexpr int32_t kFileDialogOpenOriginY         = -150;
 constexpr int32_t kFileDialogOpenOriginWidth     = 180;
 constexpr int32_t kFileDialogOpenOriginHeight    = 120;
 constexpr int32_t kFileDialogCloseTargetX        = 112;
@@ -992,8 +992,8 @@ public:
 
         setupPrompt();
         setupInput();
-        setupButton(*_discard_button, *_discard_label, kFileDiscardButtonCenterX, "ESC: Delete", lv_color_hex(0xE3433C),
-                    onDiscardClicked);
+        setupButton(*_discard_button, *_discard_label, kFileDiscardButtonCenterX, "ESC: Discard",
+                    lv_color_hex(0xE3433C), onDiscardClicked);
         setupButton(*_confirm_button, *_confirm_label, kFileConfirmButtonCenterX, "Enter: OK", lv_color_hex(0x48C064),
                     onConfirmClicked);
     }
@@ -1007,6 +1007,7 @@ public:
     {
         if (pending.active) {
             setName(pending.name);
+            showControls();
             _panel->removeFlag(LV_OBJ_FLAG_HIDDEN);
             lv_obj_move_foreground(_panel->raw_ptr());
             _visible = true;
@@ -1024,11 +1025,7 @@ public:
         } else {
             removeInputFromGroup();
             _visible = false;
-            configureCloseAnimation();
-            _x.move(kFileDialogCloseTargetX);
-            _y.move(kFileDialogCloseTargetY);
-            _width.move(kFileDialogCloseTargetSize);
-            _height.move(kFileDialogCloseTargetSize);
+            close(_view_model.pendingRecordingCloseAction().get());
         }
     }
 
@@ -1092,11 +1089,30 @@ private:
 
     void configureCloseAnimation()
     {
-        setupAnimation(_x, 0.4, 0.18f);
-        setupAnimation(_y, 0.3, 0.18f);
-        setupAnimation(_width, 0.4, 0.12f);
-        setupAnimation(_height, 0.4, 0.12f);
+        setupAnimation(_x, 0.5, 0.18f);
+        setupAnimation(_y, 0.6, 0.18f);
+        setupAnimation(_width, 0.5, 0.12f);
+        setupAnimation(_height, 0.5, 0.12f);
         _y.delay = 0.2;
+    }
+
+    void close(PendingRecordingCloseAction action)
+    {
+        if (action == PendingRecordingCloseAction::Discard) {
+            configureOpenAnimation();
+            _x.move(kFileDialogOpenOriginX);
+            _y.move(kFileDialogOpenOriginY);
+            _width.move(kFileDialogOpenOriginWidth);
+            _height.move(kFileDialogOpenOriginHeight);
+            return;
+        }
+
+        hideControls();
+        configureCloseAnimation();
+        _x.move(kFileDialogCloseTargetX);
+        _y.move(kFileDialogCloseTargetY);
+        _width.move(kFileDialogCloseTargetSize);
+        _height.move(kFileDialogCloseTargetSize);
     }
 
     void applyAnimatedValue()
@@ -1155,6 +1171,22 @@ private:
         label.setTextColor(lv_color_hex(0xFFFFFF));
         label.setTextAlign(LV_TEXT_ALIGN_CENTER);
         label.center();
+    }
+
+    void showControls()
+    {
+        _prompt_label->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _input->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _discard_button->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _confirm_button->removeFlag(LV_OBJ_FLAG_HIDDEN);
+    }
+
+    void hideControls()
+    {
+        _prompt_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+        _input->addFlag(LV_OBJ_FLAG_HIDDEN);
+        _discard_button->addFlag(LV_OBJ_FLAG_HIDDEN);
+        _confirm_button->addFlag(LV_OBJ_FLAG_HIDDEN);
     }
 
     void focusInput()
