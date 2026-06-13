@@ -1025,7 +1025,7 @@ public:
         } else {
             removeInputFromGroup();
             _visible = false;
-            close(_view_model.pendingRecordingCloseAction().get());
+            close(_view_model.pendingRecordingCloseAction());
         }
     }
 
@@ -1365,41 +1365,23 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _file_confirm_dialog = std::make_unique<FileConfirmDialog>(_root->raw_ptr(), _view_model);
     _paused_label        = std::make_unique<PausedLabel>(_root->raw_ptr());
 
-    _key_bar                  = std::make_unique<BottomKeyBar>(_root->raw_ptr());
-    _state_observer_id        = _view_model.state().observe(this, onStateChanged);
-    _elapsed_observer_id      = _view_model.elapsedSec().observe(this, onElapsedChanged);
-    _frame_observer_id        = _view_model.frame().observe(this, onFrameChanged);
-    _waveform_observer_id     = _view_model.waveformType().observe(this, onWaveformTypeChanged);
-    _pending_observer_id      = _view_model.pendingRecording().observe(this, onPendingRecordingChanged);
-    _pending_name_observer_id = _view_model.pendingRecordingName().observe(this, onPendingRecordingNameChanged);
+    _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
+    _view_model.state().observe(this, onStateChanged);
+    _view_model.elapsedSec().observe(this, onElapsedChanged);
+    _view_model.frame().observe(this, onFrameChanged);
+    _view_model.waveformType().observe(this, onWaveformTypeChanged);
+    _view_model.pendingRecording().observe(this, onPendingRecordingChanged);
+    _view_model.pendingRecordingName().observe(this, onPendingRecordingNameChanged);
 }
 
 void RecordingView::onExit()
 {
-    if (_pending_name_observer_id != 0) {
-        _view_model.pendingRecordingName().removeObserver(_pending_name_observer_id);
-        _pending_name_observer_id = 0;
-    }
-    if (_pending_observer_id != 0) {
-        _view_model.pendingRecording().removeObserver(_pending_observer_id);
-        _pending_observer_id = 0;
-    }
-    if (_waveform_observer_id != 0) {
-        _view_model.waveformType().removeObserver(_waveform_observer_id);
-        _waveform_observer_id = 0;
-    }
-    if (_frame_observer_id != 0) {
-        _view_model.frame().removeObserver(_frame_observer_id);
-        _frame_observer_id = 0;
-    }
-    if (_elapsed_observer_id != 0) {
-        _view_model.elapsedSec().removeObserver(_elapsed_observer_id);
-        _elapsed_observer_id = 0;
-    }
-    if (_state_observer_id != 0) {
-        _view_model.state().removeObserver(_state_observer_id);
-        _state_observer_id = 0;
-    }
+    _view_model.pendingRecordingName().removeObserver();
+    _view_model.pendingRecording().removeObserver();
+    _view_model.waveformType().removeObserver();
+    _view_model.frame().removeObserver();
+    _view_model.elapsedSec().removeObserver();
+    _view_model.state().removeObserver();
 
     _key_bar.reset();
     _paused_label.reset();

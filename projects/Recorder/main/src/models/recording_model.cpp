@@ -711,7 +711,6 @@ void RecordingModel::tick(uint32_t nowMs)
         return;
     }
     _frame.set(next);
-    _mic_amp.set(_frame.get().amp);
 }
 
 }  // namespace recorder

@@ -32,42 +32,37 @@ public:
     void onKey(uint32_t key) override;
     void tick(uint32_t nowMs) override;
 
-    smooth_ui_toolkit::Observable<RecordingState>& state()
+    smooth_ui_toolkit::SingleObservable<RecordingState>& state()
     {
         return _model.state();
     }
 
-    smooth_ui_toolkit::Observable<float>& micAmp()
-    {
-        return _model.micAmp();
-    }
-
-    smooth_ui_toolkit::Observable<AudioFrame>& frame()
+    smooth_ui_toolkit::SingleObservable<AudioFrame>& frame()
     {
         return _model.frame();
     }
 
-    smooth_ui_toolkit::Observable<uint32_t>& elapsedSec()
+    smooth_ui_toolkit::SingleObservable<uint32_t>& elapsedSec()
     {
         return _model.elapsedSec();
     }
 
-    smooth_ui_toolkit::Observable<PendingRecordingFile>& pendingRecording()
+    smooth_ui_toolkit::SingleObservable<PendingRecordingFile>& pendingRecording()
     {
         return _model.pendingRecording();
     }
 
-    smooth_ui_toolkit::Observable<std::string>& pendingRecordingName()
+    smooth_ui_toolkit::SingleObservable<std::string>& pendingRecordingName()
     {
         return _pending_recording_name;
     }
 
-    smooth_ui_toolkit::Observable<RecordingWaveformType>& waveformType()
+    smooth_ui_toolkit::SingleObservable<RecordingWaveformType>& waveformType()
     {
         return _waveform_type;
     }
 
-    smooth_ui_toolkit::Observable<PendingRecordingCloseAction>& pendingRecordingCloseAction()
+    PendingRecordingCloseAction pendingRecordingCloseAction() const
     {
         return _pending_recording_close_action;
     }
@@ -78,11 +73,10 @@ public:
 
 private:
     RecordingModel& _model;
-    smooth_ui_toolkit::Observable<RecordingWaveformType> _waveform_type{RecordingWaveformType::Basic};
-    smooth_ui_toolkit::Observable<std::string> _pending_recording_name{""};
-    smooth_ui_toolkit::Observable<PendingRecordingCloseAction> _pending_recording_close_action{
-        PendingRecordingCloseAction::None};
-    bool _pending_recording_active = false;
+    smooth_ui_toolkit::SingleObservable<RecordingWaveformType> _waveform_type{RecordingWaveformType::Basic};
+    smooth_ui_toolkit::SingleObservable<std::string> _pending_recording_name{""};
+    PendingRecordingCloseAction _pending_recording_close_action = PendingRecordingCloseAction::None;
+    bool _pending_recording_active                              = false;
 
     void syncPendingRecordingName();
 };

@@ -4,7 +4,6 @@
 #include "views/bottom_key_bar.hpp"
 #include "views/view.hpp"
 #include <lvgl/lvgl_cpp/obj.hpp>
-#include <cstddef>
 #include <memory>
 #include <string>
 
@@ -36,12 +35,6 @@ private:
     std::unique_ptr<FileConfirmDialog> _file_confirm_dialog;
     std::unique_ptr<PausedLabel> _paused_label;
     std::unique_ptr<BottomKeyBar> _key_bar;
-    size_t _state_observer_id        = 0;
-    size_t _elapsed_observer_id      = 0;
-    size_t _frame_observer_id        = 0;
-    size_t _waveform_observer_id     = 0;
-    size_t _pending_observer_id      = 0;
-    size_t _pending_name_observer_id = 0;
 
     void createWaveform(RecordingWaveformType type);
     void renderState(RecordingState state);
