@@ -1087,14 +1087,16 @@ private:
         setupAnimation(_y, 0.35, 0.3f);
         setupAnimation(_width, 0.35, 0.2f);
         setupAnimation(_height, 0.35, 0.2f);
+        _y.delay = 0.0;
     }
 
     void configureCloseAnimation()
     {
-        setupAnimation(_x, kFileDialogCloseMoveDuration, 0.18f);
-        setupAnimation(_y, kFileDialogCloseMoveDuration, 0.18f);
-        setupAnimation(_width, kFileDialogCloseSizeDuration, 0.12f);
-        setupAnimation(_height, kFileDialogCloseSizeDuration, 0.12f);
+        setupAnimation(_x, 0.4, 0.18f);
+        setupAnimation(_y, 0.3, 0.18f);
+        setupAnimation(_width, 0.4, 0.12f);
+        setupAnimation(_height, 0.4, 0.12f);
+        _y.delay = 0.2;
     }
 
     void applyAnimatedValue()
