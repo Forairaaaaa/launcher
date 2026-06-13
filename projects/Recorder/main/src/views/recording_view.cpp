@@ -23,6 +23,7 @@ constexpr int32_t kWaveformBarPitch          = 3;
 constexpr int32_t kWaveformMinBarHeight      = 2;
 constexpr int32_t kWaveformMaxBarHeight      = 86;
 constexpr size_t kWaveformBarCount           = 86;
+constexpr size_t kWaveformEdgeFadeBarCount   = 3;
 constexpr uint32_t kWaveformHistoryMs        = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs = kWaveformHistoryMs / kWaveformBarCount;
 constexpr float kWaveformGain                = 8.0f;
@@ -128,6 +129,17 @@ private:
         return std::pow(gained, 0.68f);
     }
 
+    static lv_opa_t barOpacity(size_t index)
+    {
+        const size_t edge_distance = std::min(index, kWaveformBarCount - 1 - index);
+        if (edge_distance >= kWaveformEdgeFadeBarCount) {
+            return LV_OPA_COVER;
+        }
+
+        const size_t fade_step = edge_distance + 1;
+        return static_cast<lv_opa_t>((LV_OPA_COVER * fade_step) / (kWaveformEdgeFadeBarCount + 1));
+    }
+
     void draw(lv_event_t* event)
     {
         lv_layer_t* layer = lv_event_get_layer(event);
@@ -161,6 +173,7 @@ private:
             line_dsc.p1.y      = mid_y - half;
             line_dsc.p2.x      = x;
             line_dsc.p2.y      = mid_y + half;
+            line_dsc.opa       = barOpacity(index);
             lv_draw_line(layer, &line_dsc);
             ++index;
         });
