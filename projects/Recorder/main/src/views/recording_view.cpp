@@ -26,7 +26,7 @@ public:
           _width(kDurationPanelHiddenWidth),
           _y(kDurationPanelHiddenY)
     {
-        _width.springOptions().visualDuration = 0.4f;
+        _width.springOptions().visualDuration = 0.35f;
         _width.springOptions().bounce         = 0.5f;
         _y.springOptions().visualDuration     = 0.3f;
         _y.springOptions().bounce             = 0.5f;
@@ -112,7 +112,8 @@ private:
     {
         flow                = std::make_unique<smooth_ui_toolkit::lvgl_cpp::NumberFlow>(_panel->raw_ptr());
         flow->animationType = smooth_ui_toolkit::AnimationType::Spring;
-        flow->minDigits     = 2;
+        flow->animationOptions.springVisualDuration = 0.3f;
+        flow->minDigits                             = 2;
         flow->setTextFont(&font_chivo_mono_medium_12);
         flow->setDigitColor(lv_color_hex(0xFFFFFF));
         flow->init();
