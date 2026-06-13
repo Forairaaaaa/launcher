@@ -1,5 +1,7 @@
 #include "views/recording_files_view.hpp"
 #include "assets/assets.h"
+#include <core/animation/animate_value/animate_value.hpp>
+#include <core/animation/generators/generators.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <widget/select_menu/smooth_selector.hpp>
 #include <algorithm>
@@ -10,32 +12,56 @@ namespace recorder {
 
 namespace {
 
-constexpr int32_t kMenuWidth             = 320;
-constexpr int32_t kMenuHeight            = 123;
-constexpr int32_t kMenuSelectedX         = 27;
-constexpr int32_t kMenuSelectedY         = 9;
-constexpr int32_t kMenuItemMinWidth      = 82;
-constexpr int32_t kMenuItemMaxWidth      = 262;
-constexpr int32_t kMenuItemHeight        = 24;
-constexpr int32_t kMenuItemPitch         = 41;
-constexpr int32_t kMenuTextPaddingLeft   = 11;
-constexpr int32_t kMenuTextPaddingRight  = 11;
-constexpr int32_t kMenuSelectorRadius    = 8;
-constexpr int32_t kMenuCameraPaddingY    = 9;
-constexpr int32_t kDividerX              = 32;
-constexpr int32_t kDividerY              = 123;
-constexpr int32_t kDividerWidth          = 256;
-constexpr int32_t kDividerHeight         = 2;
-constexpr uint32_t kDividerColor         = 0x2B2B2B;
-constexpr uint32_t kSelectorColor        = 0x2E2E2E;
-constexpr uint32_t kTextColor            = 0xFFFFFF;
-constexpr uint32_t kEmptyTextColor       = 0x666666;
-constexpr float kSelectorMoveDuration    = 0.32f;
-constexpr float kSelectorMoveBounce      = 0.30f;
-constexpr float kSelectorShapeDuration   = 0.30f;
-constexpr float kSelectorShapeBounce     = 0.18f;
-constexpr float kCameraDuration          = 0.44f;
-constexpr uint32_t kMenuRenderIntervalMs = 16;
+constexpr int32_t kMenuWidth              = 320;
+constexpr int32_t kMenuHeight             = 123;
+constexpr int32_t kMenuSelectedX          = 27;
+constexpr int32_t kMenuSelectedY          = 9;
+constexpr int32_t kMenuItemMinWidth       = 82;
+constexpr int32_t kMenuItemMaxWidth       = 262;
+constexpr int32_t kMenuItemHeight         = 24;
+constexpr int32_t kMenuItemPitch          = 41;
+constexpr int32_t kMenuTextPaddingLeft    = 11;
+constexpr int32_t kMenuTextPaddingRight   = 11;
+constexpr int32_t kMenuSelectorRadius     = 8;
+constexpr int32_t kMenuCameraPaddingY     = 9;
+constexpr int32_t kDividerX               = 32;
+constexpr int32_t kDividerY               = 123;
+constexpr int32_t kDividerWidth           = 256;
+constexpr int32_t kDividerHeight          = 2;
+constexpr uint32_t kDividerColor          = 0x2B2B2B;
+constexpr uint32_t kSelectorColor         = 0x2E2E2E;
+constexpr uint32_t kTextColor             = 0xFFFFFF;
+constexpr uint32_t kEmptyTextColor        = 0x666666;
+constexpr int32_t kDeleteDialogWidth      = 258;
+constexpr int32_t kDeleteDialogHeight     = 100;
+constexpr int32_t kDeleteDialogY          = -21;
+constexpr int32_t kDeleteDialogRadius     = 14;
+constexpr int32_t kDeleteNameAreaWidth    = 238;
+constexpr int32_t kDeleteNameAreaHeight   = 28;
+constexpr int32_t kDeleteNameAreaRadius   = 5;
+constexpr int32_t kDeleteButtonWidth      = 96;
+constexpr int32_t kDeleteButtonHeight     = 23;
+constexpr int32_t kDeleteButtonRadius     = 5;
+constexpr int32_t kDeletePromptCenterX    = 0;
+constexpr int32_t kDeletePromptCenterY    = -32;
+constexpr int32_t kDeleteNameAreaCenterX  = 0;
+constexpr int32_t kDeleteNameAreaCenterY  = -5;
+constexpr int32_t kDeleteButtonCenterY    = 28;
+constexpr int32_t kDeleteCancelButtonX    = -33;
+constexpr int32_t kDeleteConfirmButtonX   = 71;
+constexpr int32_t kDeleteOpenOriginX      = 0;
+constexpr int32_t kDeleteOpenOriginY      = -150;
+constexpr int32_t kDeleteOpenOriginWidth  = 180;
+constexpr int32_t kDeleteOpenOriginHeight = 120;
+constexpr int32_t kDeleteCloseTargetX     = 112;
+constexpr int32_t kDeleteCloseTargetY     = 128;
+constexpr int32_t kDeleteCloseTargetSize  = 18;
+constexpr float kSelectorMoveDuration     = 0.32f;
+constexpr float kSelectorMoveBounce       = 0.30f;
+constexpr float kSelectorShapeDuration    = 0.30f;
+constexpr float kSelectorShapeBounce      = 0.18f;
+constexpr float kCameraDuration           = 0.44f;
+constexpr uint32_t kMenuRenderIntervalMs  = 16;
 
 std::string fileDisplayName(const RecordingFile& file)
 {
@@ -285,6 +311,226 @@ private:
     }
 };
 
+class RecordingFilesView::DeleteConfirmDialog {
+public:
+    DeleteConfirmDialog(lv_obj_t* parent, FilesViewModel& view_model)
+        : _view_model(view_model),
+          _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent)),
+          _prompt_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr())),
+          _name_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr())),
+          _cancel_button(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
+          _confirm_button(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
+          _cancel_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_cancel_button->raw_ptr())),
+          _confirm_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_confirm_button->raw_ptr())),
+          _x(kDeleteOpenOriginX),
+          _y(kDeleteOpenOriginY),
+          _width(kDeleteOpenOriginWidth),
+          _height(kDeleteOpenOriginHeight)
+    {
+        configureOpenAnimation();
+
+        applyAnimatedValue();
+        _panel->setBgColor(lv_color_hex(0x722B28));
+        _panel->setBgOpa(LV_OPA_COVER);
+        _panel->setRadius(kDeleteDialogRadius);
+        _panel->setBorderWidth(0);
+        _panel->setShadowWidth(0);
+        _panel->setPaddingAll(0);
+        _panel->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+        _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+
+        setupPrompt();
+        setupNameArea();
+        setupButton(*_cancel_button, *_cancel_label, kDeleteCancelButtonX, "ESC: Cancel", lv_color_hex(0x94504D),
+                    onCancelClicked);
+        setupButton(*_confirm_button, *_confirm_label, kDeleteConfirmButtonX, "Enter: Delete", lv_color_hex(0xE3433C),
+                    onConfirmClicked);
+    }
+
+    void setPending(const PendingDeleteRecordingFile& pending)
+    {
+        if (pending.active) {
+            setName(fileDisplayName(pending.file));
+            showControls();
+            _panel->removeFlag(LV_OBJ_FLAG_HIDDEN);
+            lv_obj_move_foreground(_panel->raw_ptr());
+            _visible = true;
+            configureOpenAnimation();
+            _x.teleport(kDeleteOpenOriginX);
+            _y.teleport(kDeleteOpenOriginY);
+            _width.teleport(kDeleteOpenOriginWidth);
+            _height.teleport(kDeleteOpenOriginHeight);
+            applyAnimatedValue();
+            _x.move(0);
+            _y.move(kDeleteDialogY);
+            _width.move(kDeleteDialogWidth);
+            _height.move(kDeleteDialogHeight);
+        } else {
+            _visible = false;
+            close(_view_model.deleteRecordingCloseAction());
+        }
+    }
+
+    void tick()
+    {
+        _x.update();
+        _y.update();
+        _width.update();
+        _height.update();
+        applyAnimatedValue();
+
+        if (!_visible && _x.done() && _y.done() && _width.done() && _height.done()) {
+            _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+private:
+    FilesViewModel& _view_model;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _prompt_label;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _name_label;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _cancel_button;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _confirm_button;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _cancel_label;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _confirm_label;
+    smooth_ui_toolkit::AnimateValue _x;
+    smooth_ui_toolkit::AnimateValue _y;
+    smooth_ui_toolkit::AnimateValue _width;
+    smooth_ui_toolkit::AnimateValue _height;
+    bool _visible = false;
+
+    static void setupAnimation(smooth_ui_toolkit::AnimateValue& value, float duration, float bounce)
+    {
+        value.springOptions().visualDuration = duration;
+        value.springOptions().bounce         = bounce;
+    }
+
+    void configureOpenAnimation()
+    {
+        setupAnimation(_x, 0.35, 0.4f);
+        setupAnimation(_y, 0.35, 0.3f);
+        setupAnimation(_width, 0.35, 0.2f);
+        setupAnimation(_height, 0.35, 0.2f);
+        _y.delay = 0.0;
+    }
+
+    void configureCloseAnimation()
+    {
+        setupAnimation(_x, 0.4, 0.18f);
+        setupAnimation(_y, 0.5, 0.18f);
+        setupAnimation(_width, 0.4, 0.12f);
+        setupAnimation(_height, 0.4, 0.12f);
+        _y.delay = 0.2;
+    }
+
+    void close(DeleteRecordingCloseAction action)
+    {
+        if (action == DeleteRecordingCloseAction::Cancel) {
+            configureOpenAnimation();
+            _x.move(kDeleteOpenOriginX);
+            _y.move(kDeleteOpenOriginY);
+            _width.move(kDeleteOpenOriginWidth);
+            _height.move(kDeleteOpenOriginHeight);
+            return;
+        }
+
+        hideControls();
+        configureCloseAnimation();
+        _x.move(kDeleteCloseTargetX);
+        _y.move(kDeleteCloseTargetY);
+        _width.move(kDeleteCloseTargetSize);
+        _height.move(kDeleteCloseTargetSize);
+    }
+
+    void applyAnimatedValue()
+    {
+        _panel->setSize(static_cast<int32_t>(std::round(_width.directValue())),
+                        static_cast<int32_t>(std::round(_height.directValue())));
+        _panel->align(LV_ALIGN_CENTER, static_cast<int32_t>(std::round(_x.directValue())),
+                      static_cast<int32_t>(std::round(_y.directValue())));
+    }
+
+    void setupPrompt()
+    {
+        _prompt_label->setText("Delete recording?");
+        _prompt_label->setTextFont(&font_chivo_medium_14);
+        _prompt_label->setTextColor(lv_color_hex(0xD7ADAB));
+        _prompt_label->setTextAlign(LV_TEXT_ALIGN_LEFT);
+        _prompt_label->setSize(230, LV_SIZE_CONTENT);
+        _prompt_label->align(LV_ALIGN_CENTER, kDeletePromptCenterX, kDeletePromptCenterY);
+    }
+
+    void setupNameArea()
+    {
+        _name_label->setText("");
+        _name_label->setTextFont(&font_chivo_medium_14);
+        _name_label->setTextColor(lv_color_hex(0xFFFFFF));
+        _name_label->setLongMode(LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+        _name_label->setSize(kDeleteNameAreaWidth - 18, LV_SIZE_CONTENT);
+        _name_label->align(LV_ALIGN_CENTER, kDeleteNameAreaCenterX, kDeleteNameAreaCenterY);
+    }
+
+    void setupButton(smooth_ui_toolkit::lvgl_cpp::Container& button, smooth_ui_toolkit::lvgl_cpp::Label& label,
+                     int32_t x, const char* text, lv_color_t color, lv_event_cb_t callback)
+    {
+        button.setSize(kDeleteButtonWidth, kDeleteButtonHeight);
+        button.align(LV_ALIGN_CENTER, x, kDeleteButtonCenterY);
+        button.setBgColor(color);
+        button.setBgOpa(LV_OPA_COVER);
+        button.setRadius(kDeleteButtonRadius);
+        button.setBorderWidth(0);
+        button.setShadowWidth(0);
+        button.setPaddingAll(0);
+        button.removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        button.addFlag(LV_OBJ_FLAG_CLICKABLE);
+        button.addEventCb(callback, LV_EVENT_CLICKED, this);
+
+        label.setText(text);
+        label.setTextFont(&font_chivo_medium_14);
+        label.setTextColor(lv_color_hex(0xFFFFFF));
+        label.setTextAlign(LV_TEXT_ALIGN_CENTER);
+        label.center();
+    }
+
+    void setName(const std::string& name)
+    {
+        _name_label->setText(name);
+    }
+
+    void showControls()
+    {
+        _prompt_label->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _name_label->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _cancel_button->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _confirm_button->removeFlag(LV_OBJ_FLAG_HIDDEN);
+    }
+
+    void hideControls()
+    {
+        _prompt_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+        _name_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+        _cancel_button->addFlag(LV_OBJ_FLAG_HIDDEN);
+        _confirm_button->addFlag(LV_OBJ_FLAG_HIDDEN);
+    }
+
+    static void onCancelClicked(lv_event_t* event)
+    {
+        auto* self = static_cast<DeleteConfirmDialog*>(lv_event_get_user_data(event));
+        if (self) {
+            self->_view_model.cancelDeleteRecording();
+        }
+    }
+
+    static void onConfirmClicked(lv_event_t* event)
+    {
+        auto* self = static_cast<DeleteConfirmDialog*>(lv_event_get_user_data(event));
+        if (self) {
+            self->_view_model.confirmDeleteRecording();
+        }
+    }
+};
+
 RecordingFilesView::RecordingFilesView(FilesViewModel& view_model) : _view_model(view_model)
 {
 }
@@ -307,7 +553,8 @@ void RecordingFilesView::onEnter(lv_obj_t* parent)
     _root->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
-    _menu = std::make_unique<RecordingFilesMenu>(_root->raw_ptr());
+    _menu                  = std::make_unique<RecordingFilesMenu>(_root->raw_ptr());
+    _delete_confirm_dialog = std::make_unique<DeleteConfirmDialog>(_root->raw_ptr(), _view_model);
 
     _divider = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_root->raw_ptr());
     _divider->setSize(kDividerWidth, kDividerHeight);
@@ -329,10 +576,16 @@ void RecordingFilesView::onEnter(lv_obj_t* parent)
 
     _files_observer_id          = _view_model.files().observe(this, onFilesChanged);
     _selected_index_observer_id = _view_model.selectedIndex().observe(this, onSelectedIndexChanged);
+    _view_model.pendingDeleteRecording().observe(this, onPendingDeleteRecordingChanged);
+    _pending_delete_observing = true;
 }
 
 void RecordingFilesView::onExit()
 {
+    if (_pending_delete_observing) {
+        _view_model.pendingDeleteRecording().removeObserver();
+        _pending_delete_observing = false;
+    }
     if (_selected_index_observer_id != 0) {
         _view_model.selectedIndex().removeObserver(_selected_index_observer_id);
         _selected_index_observer_id = 0;
@@ -344,6 +597,7 @@ void RecordingFilesView::onExit()
 
     _key_bar.reset();
     _divider.reset();
+    _delete_confirm_dialog.reset();
     _menu.reset();
     _root.reset();
 }
@@ -355,6 +609,9 @@ void RecordingFilesView::tick(uint32_t nowMs)
     }
     if (_key_bar) {
         _key_bar->tick();
+    }
+    if (_delete_confirm_dialog) {
+        _delete_confirm_dialog->tick();
     }
 }
 
@@ -372,6 +629,13 @@ void RecordingFilesView::renderSelectedIndex(int index)
     }
 }
 
+void RecordingFilesView::renderPendingDeleteRecording(const PendingDeleteRecordingFile& pending)
+{
+    if (_delete_confirm_dialog) {
+        _delete_confirm_dialog->setPending(pending);
+    }
+}
+
 void RecordingFilesView::onFilesChanged(void* context, const std::vector<RecordingFile>& files)
 {
     auto* self = static_cast<RecordingFilesView*>(context);
@@ -385,6 +649,14 @@ void RecordingFilesView::onSelectedIndexChanged(void* context, const int& index)
     auto* self = static_cast<RecordingFilesView*>(context);
     if (self) {
         self->renderSelectedIndex(index);
+    }
+}
+
+void RecordingFilesView::onPendingDeleteRecordingChanged(void* context, const PendingDeleteRecordingFile& pending)
+{
+    auto* self = static_cast<RecordingFilesView*>(context);
+    if (self) {
+        self->renderPendingDeleteRecording(pending);
     }
 }
 

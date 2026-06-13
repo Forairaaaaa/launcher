@@ -18,6 +18,21 @@ void FilesViewModel::onEnter()
 
 void FilesViewModel::onKey(uint32_t key)
 {
+    if (_pending_delete_recording.get().active) {
+        switch (key) {
+            case '\x1b':
+                cancelDeleteRecording();
+                break;
+            case '\r':
+            case '\n':
+                confirmDeleteRecording();
+                break;
+            default:
+                break;
+        }
+        return;
+    }
+
     switch (key) {
         case '4':
             _router.back();
@@ -38,11 +53,38 @@ void FilesViewModel::onKey(uint32_t key)
             break;
         }
         case '8':
-            _files_model.deleteSelected();
+            requestDeleteSelected();
             break;
         default:
             break;
     }
+}
+
+void FilesViewModel::requestDeleteSelected()
+{
+    const RecordingFile* selected = _files_model.selectedFile();
+    if (!selected) {
+        return;
+    }
+
+    spdlog::info("FilesViewModel: request delete {}", selected->path);
+    _delete_recording_close_action = DeleteRecordingCloseAction::None;
+    _pending_delete_recording.set(PendingDeleteRecordingFile{true, *selected});
+}
+
+void FilesViewModel::cancelDeleteRecording()
+{
+    spdlog::info("FilesViewModel: cancel delete");
+    _delete_recording_close_action = DeleteRecordingCloseAction::Cancel;
+    _pending_delete_recording.set(PendingDeleteRecordingFile{});
+}
+
+void FilesViewModel::confirmDeleteRecording()
+{
+    spdlog::info("FilesViewModel: confirm delete");
+    _delete_recording_close_action = DeleteRecordingCloseAction::Confirm;
+    _pending_delete_recording.set(PendingDeleteRecordingFile{});
+    _files_model.deleteSelected();
 }
 
 }  // namespace recorder
