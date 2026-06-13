@@ -85,19 +85,30 @@ constexpr int32_t kFileDialogWidth               = 258;
 constexpr int32_t kFileDialogHeight              = 100;
 constexpr int32_t kFileDialogY                   = kWaveformPanelY;
 constexpr int32_t kFileDialogRadius              = 14;
-constexpr int32_t kFilePromptX                   = 17;
-constexpr int32_t kFilePromptY                   = 10;
-constexpr int32_t kFileNameAreaX                 = 11;
-constexpr int32_t kFileNameAreaY                 = 34;
 constexpr int32_t kFileNameAreaWidth             = 238;
 constexpr int32_t kFileNameAreaHeight            = 28;
 constexpr int32_t kFileNameAreaRadius            = 5;
-constexpr int32_t kFileButtonY                   = 67;
 constexpr int32_t kFileButtonWidth               = 87;
 constexpr int32_t kFileButtonHeight              = 23;
 constexpr int32_t kFileButtonRadius              = 5;
-constexpr int32_t kFileDiscardButtonX            = 65;
-constexpr int32_t kFileConfirmButtonX            = 162;
+constexpr int32_t kFilePromptCenterX             = 0;
+constexpr int32_t kFilePromptCenterY             = -32;
+constexpr int32_t kFileNameAreaCenterX           = 0;
+constexpr int32_t kFileNameAreaCenterY           = -2;
+constexpr int32_t kFileButtonCenterY             = 28;
+constexpr int32_t kFileDiscardButtonCenterX      = -21;
+constexpr int32_t kFileConfirmButtonCenterX      = 76;
+constexpr int32_t kFileDialogOpenOriginX         = 0;
+constexpr int32_t kFileDialogOpenOriginY         = -120;
+constexpr int32_t kFileDialogOpenOriginWidth     = 180;
+constexpr int32_t kFileDialogOpenOriginHeight    = 120;
+constexpr int32_t kFileDialogCloseTargetX        = 112;
+constexpr int32_t kFileDialogCloseTargetY        = 128;
+constexpr int32_t kFileDialogCloseTargetSize     = 18;
+constexpr float kFileDialogOpenMoveDuration      = 0.42f;
+constexpr float kFileDialogOpenSizeDuration      = 0.34f;
+constexpr float kFileDialogCloseMoveDuration     = 0.44f;
+constexpr float kFileDialogCloseSizeDuration     = 0.30f;
 
 }  // namespace
 
@@ -960,10 +971,15 @@ public:
           _discard_button(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
           _confirm_button(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
           _discard_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_discard_button->raw_ptr())),
-          _confirm_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_confirm_button->raw_ptr()))
+          _confirm_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_confirm_button->raw_ptr())),
+          _x(kFileDialogOpenOriginX),
+          _y(kFileDialogOpenOriginY),
+          _width(kFileDialogOpenOriginWidth),
+          _height(kFileDialogOpenOriginHeight)
     {
-        _panel->setSize(kFileDialogWidth, kFileDialogHeight);
-        _panel->align(LV_ALIGN_CENTER, 0, kFileDialogY);
+        configureOpenAnimation();
+
+        applyAnimatedValue();
         _panel->setBgColor(lv_color_hex(0x2D2D2D));
         _panel->setBgOpa(LV_OPA_COVER);
         _panel->setRadius(kFileDialogRadius);
@@ -976,9 +992,9 @@ public:
 
         setupPrompt();
         setupInput();
-        setupButton(*_discard_button, *_discard_label, kFileDiscardButtonX, "ESC: Delete", lv_color_hex(0xE3433C),
+        setupButton(*_discard_button, *_discard_label, kFileDiscardButtonCenterX, "ESC: Delete", lv_color_hex(0xE3433C),
                     onDiscardClicked);
-        setupButton(*_confirm_button, *_confirm_label, kFileConfirmButtonX, "Enter: OK", lv_color_hex(0x48C064),
+        setupButton(*_confirm_button, *_confirm_label, kFileConfirmButtonCenterX, "Enter: OK", lv_color_hex(0x48C064),
                     onConfirmClicked);
     }
 
@@ -993,10 +1009,26 @@ public:
             setName(pending.name);
             _panel->removeFlag(LV_OBJ_FLAG_HIDDEN);
             lv_obj_move_foreground(_panel->raw_ptr());
+            _visible = true;
+            configureOpenAnimation();
+            _x.teleport(kFileDialogOpenOriginX);
+            _y.teleport(kFileDialogOpenOriginY);
+            _width.teleport(kFileDialogOpenOriginWidth);
+            _height.teleport(kFileDialogOpenOriginHeight);
+            applyAnimatedValue();
+            _x.move(0);
+            _y.move(kFileDialogY);
+            _width.move(kFileDialogWidth);
+            _height.move(kFileDialogHeight);
             focusInput();
         } else {
             removeInputFromGroup();
-            _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+            _visible = false;
+            configureCloseAnimation();
+            _x.move(kFileDialogCloseTargetX);
+            _y.move(kFileDialogCloseTargetY);
+            _width.move(kFileDialogCloseTargetSize);
+            _height.move(kFileDialogCloseTargetSize);
         }
     }
 
@@ -1013,6 +1045,19 @@ public:
         _updating_text = false;
     }
 
+    void tick()
+    {
+        _x.update();
+        _y.update();
+        _width.update();
+        _height.update();
+        applyAnimatedValue();
+
+        if (!_visible && _x.done() && _y.done() && _width.done() && _height.done()) {
+            _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
 private:
     RecordingViewModel& _view_model;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
@@ -1022,8 +1067,43 @@ private:
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _confirm_button;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _discard_label;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _confirm_label;
+    smooth_ui_toolkit::AnimateValue _x;
+    smooth_ui_toolkit::AnimateValue _y;
+    smooth_ui_toolkit::AnimateValue _width;
+    smooth_ui_toolkit::AnimateValue _height;
     bool _input_in_group = false;
     bool _updating_text  = false;
+    bool _visible        = false;
+
+    static void setupAnimation(smooth_ui_toolkit::AnimateValue& value, float duration, float bounce)
+    {
+        value.springOptions().visualDuration = duration;
+        value.springOptions().bounce         = bounce;
+    }
+
+    void configureOpenAnimation()
+    {
+        setupAnimation(_x, 0.35, 0.4f);
+        setupAnimation(_y, 0.35, 0.3f);
+        setupAnimation(_width, 0.35, 0.2f);
+        setupAnimation(_height, 0.35, 0.2f);
+    }
+
+    void configureCloseAnimation()
+    {
+        setupAnimation(_x, kFileDialogCloseMoveDuration, 0.18f);
+        setupAnimation(_y, kFileDialogCloseMoveDuration, 0.18f);
+        setupAnimation(_width, kFileDialogCloseSizeDuration, 0.12f);
+        setupAnimation(_height, kFileDialogCloseSizeDuration, 0.12f);
+    }
+
+    void applyAnimatedValue()
+    {
+        _panel->setSize(static_cast<int32_t>(std::round(_width.directValue())),
+                        static_cast<int32_t>(std::round(_height.directValue())));
+        _panel->align(LV_ALIGN_CENTER, static_cast<int32_t>(std::round(_x.directValue())),
+                      static_cast<int32_t>(std::round(_y.directValue())));
+    }
 
     void setupPrompt()
     {
@@ -1032,13 +1112,13 @@ private:
         _prompt_label->setTextColor(lv_color_hex(0x888888));
         _prompt_label->setTextAlign(LV_TEXT_ALIGN_LEFT);
         _prompt_label->setSize(kFileNameAreaWidth, LV_SIZE_CONTENT);
-        _prompt_label->setPos(kFilePromptX, kFilePromptY);
+        _prompt_label->align(LV_ALIGN_CENTER, kFilePromptCenterX, kFilePromptCenterY);
     }
 
     void setupInput()
     {
-        _input->setPos(kFileNameAreaX, kFileNameAreaY);
         _input->setSize(kFileNameAreaWidth, kFileNameAreaHeight);
+        _input->align(LV_ALIGN_CENTER, kFileNameAreaCenterX, kFileNameAreaCenterY);
         _input->setBgColor(lv_color_hex(0x494949));
         _input->setBgOpa(LV_OPA_COVER);
         _input->setRadius(kFileNameAreaRadius);
@@ -1056,8 +1136,8 @@ private:
     void setupButton(smooth_ui_toolkit::lvgl_cpp::Container& button, smooth_ui_toolkit::lvgl_cpp::Label& label,
                      int32_t x, const char* text, lv_color_t color, lv_event_cb_t callback)
     {
-        button.setPos(x, kFileButtonY);
         button.setSize(kFileButtonWidth, kFileButtonHeight);
+        button.align(LV_ALIGN_CENTER, x, kFileButtonCenterY);
         button.setBgColor(color);
         button.setBgOpa(LV_OPA_COVER);
         button.setRadius(kFileButtonRadius);
@@ -1304,6 +1384,9 @@ void RecordingView::tick(uint32_t nowMs)
     }
     if (_paused_label) {
         _paused_label->tick();
+    }
+    if (_file_confirm_dialog) {
+        _file_confirm_dialog->tick();
     }
     if (_waveform) {
         _waveform->tick(nowMs);
