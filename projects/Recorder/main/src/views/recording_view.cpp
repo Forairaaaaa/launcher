@@ -2,6 +2,7 @@
 #include "assets/assets.h"
 #include <core/animation/animate_value/animate_value.hpp>
 #include <core/animation/generators/generators.hpp>
+#include <core/color/color.hpp>
 #include <core/easing/ease.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/number_flow/number_flow.hpp>
@@ -18,6 +19,9 @@ constexpr int32_t kWaveformPanelWidth        = 256;
 constexpr int32_t kWaveformPanelHeight       = 90;
 constexpr int32_t kWaveformPanelX            = 0;
 constexpr int32_t kWaveformPanelY            = -21;
+constexpr uint32_t kWaveformIdleColor        = 0xFED40D;
+constexpr uint32_t kWaveformRecordingColor   = 0xF0544D;
+constexpr float kWaveformColorDuration       = 0.4f;
 constexpr int32_t kWaveformBarWidth          = 1;
 constexpr int32_t kWaveformBarPitch          = 3;
 constexpr int32_t kWaveformMinBarHeight      = 2;
@@ -44,6 +48,7 @@ public:
     virtual ~RecordingWaveformViewBase() = default;
 
     virtual void setFrame(const AudioFrame& frame) = 0;
+    virtual void setRecording(bool recording)      = 0;
     virtual void tick(uint32_t nowMs)              = 0;
 };
 
@@ -52,6 +57,10 @@ public:
     explicit IosWaveformView(lv_obj_t* parent)
         : _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent))
     {
+        _color.duration       = kWaveformColorDuration;
+        _color.easingFunction = smooth_ui_toolkit::ease::ease_out_quad;
+        _color.begin();
+
         _panel->setSize(kWaveformPanelWidth, kWaveformPanelHeight);
         _panel->align(LV_ALIGN_CENTER, kWaveformPanelX, kWaveformPanelY);
         _panel->setBgOpa(LV_OPA_TRANSP);
@@ -80,9 +89,15 @@ public:
         _target_amp = std::max(_target_amp, std::clamp(amp, 0.0f, 1.0f));
     }
 
+    void setRecording(bool recording) override
+    {
+        _color.move(recording ? kWaveformRecordingColor : kWaveformIdleColor);
+    }
+
     void tick(uint32_t nowMs) override
     {
         updateAmp(nowMs);
+        _color.update();
 
         if (_last_sample_ms == 0) {
             _last_sample_ms = nowMs;
@@ -99,6 +114,7 @@ public:
 private:
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
     smooth_ui_toolkit::RingBuffer<float, kWaveformBarCount> _bars;
+    smooth_ui_toolkit::color::AnimateRgb_t _color{kWaveformIdleColor};
     float _target_amp        = 0.0f;
     float _display_amp       = 0.0f;
     uint32_t _last_tick_ms   = 0;
@@ -152,7 +168,7 @@ private:
 
         lv_draw_line_dsc_t line_dsc;
         lv_draw_line_dsc_init(&line_dsc);
-        line_dsc.color = lv_color_hex(0xF0544D);
+        line_dsc.color = lv_color_hex(_color.toHex());
         line_dsc.width = kWaveformBarWidth;
         line_dsc.opa   = LV_OPA_COVER;
 
@@ -435,6 +451,10 @@ void RecordingView::renderState(RecordingState state)
 {
     if (!_key_bar) {
         return;
+    }
+
+    if (_waveform) {
+        _waveform->setRecording(state == RecordingState::Recording);
     }
 
     switch (state) {
