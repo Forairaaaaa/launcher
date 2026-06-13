@@ -43,8 +43,10 @@ constexpr size_t kSiriWaveformPointCount         = 96;
 constexpr float kSiriWaveformGraphX              = 22.0f;
 constexpr float kSiriWaveformAttFactor           = 4.0f;
 constexpr float kSiriWaveformGain                = 36.0f;
-constexpr float kSiriWaveformIdleAmp             = 0.44f;
-constexpr float kSiriWaveformMaxAmp              = 0.9f;
+constexpr float kSiriWaveformIdleAmp             = 0.08f;
+constexpr float kSiriWaveformMaxAmp              = 1.0f;
+constexpr float kSiriWaveformInputFloor          = 0.04f;
+constexpr float kSiriWaveformInputPower          = 0.65f;
 constexpr float kSiriWaveformResponse            = 0.18f;
 constexpr float kSiriWaveformWidthScale          = 2.0f;
 constexpr float kSiriTwoPi                       = 6.2831853f;
@@ -486,7 +488,10 @@ private:
         }
 
         const float relative = y / static_cast<float>(layer.curves.size());
-        const float amp      = std::clamp(kSiriWaveformIdleAmp + _display_amp * kSiriWaveformMaxAmp, 0.0f, 1.0f);
+        const float input_amp =
+            std::clamp((_display_amp - kSiriWaveformInputFloor) / (1.0f - kSiriWaveformInputFloor), 0.0f, 1.0f);
+        const float dynamic_amp = std::pow(input_amp, kSiriWaveformInputPower) * kSiriWaveformMaxAmp;
+        const float amp         = std::clamp(kSiriWaveformIdleAmp + dynamic_amp, 0.0f, 1.0f);
         return relative * globalAtt((graph_x / kSiriWaveformGraphX) * 2.0f) * amp;
     }
 
