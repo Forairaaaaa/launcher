@@ -3,3 +3,4 @@ dist/
 dependencies/
 __pycache__
 recordings/
+.DS_Store
