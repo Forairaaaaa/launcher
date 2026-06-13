@@ -20,6 +20,22 @@ lv_event_code_t keyboardEventCode()
 #endif
 }
 
+bool textInputFocused()
+{
+    lv_indev_t* indev = lv_indev_get_next(nullptr);
+    while (indev) {
+        lv_group_t* group = lv_indev_get_group(indev);
+        if (group) {
+            lv_obj_t* focused = lv_group_get_focused(group);
+            if (focused && lv_obj_check_type(focused, &lv_textarea_class)) {
+                return true;
+            }
+        }
+        indev = lv_indev_get_next(indev);
+    }
+    return false;
+}
+
 }  // namespace
 
 RecorderApp::RecorderApp()
@@ -127,7 +143,17 @@ void RecorderApp::onKeyboardEvent(lv_event_t* event)
         return;
     }
 
-    if (key->utf8[0] >= '0' && key->utf8[0] <= '9') {
+    if (key->lv_key == LV_KEY_ESC) {
+        self->onKey('\x1b');
+        return;
+    }
+
+    if (key->lv_key == LV_KEY_ENTER) {
+        self->onKey('\r');
+        return;
+    }
+
+    if (!textInputFocused() && key->utf8[0] >= '0' && key->utf8[0] <= '9') {
         self->onKey(static_cast<uint32_t>(key->utf8[0]));
     }
 }

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -61,6 +62,81 @@ std::string makeRecordingPath()
     std::ostringstream name;
     name << dir << "/rec_" << std::put_time(&tm, "%Y%m%d_%H%M%S") << ".wav";
     return name.str();
+}
+
+std::string directoryName(const std::string& path)
+{
+    const size_t pos = path.find_last_of('/');
+    if (pos == std::string::npos) {
+        return ".";
+    }
+    if (pos == 0) {
+        return "/";
+    }
+    return path.substr(0, pos);
+}
+
+std::string baseName(const std::string& path)
+{
+    const size_t pos = path.find_last_of('/');
+    if (pos == std::string::npos) {
+        return path;
+    }
+    return path.substr(pos + 1);
+}
+
+std::string stripWavExtension(const std::string& name)
+{
+    if (name.size() >= 4) {
+        std::string ext = name.substr(name.size() - 4);
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (ext == ".wav") {
+            return name.substr(0, name.size() - 4);
+        }
+    }
+    return name;
+}
+
+std::string sanitizeRecordingName(const std::string& name)
+{
+    std::string sanitized;
+    sanitized.reserve(name.size());
+    for (char c : stripWavExtension(name)) {
+        const auto uc = static_cast<unsigned char>(c);
+        if (std::isalnum(uc) || c == '_' || c == '-' || c == ' ') {
+            sanitized.push_back(c);
+        }
+    }
+
+    while (!sanitized.empty() && sanitized.front() == ' ') {
+        sanitized.erase(sanitized.begin());
+    }
+    while (!sanitized.empty() && sanitized.back() == ' ') {
+        sanitized.pop_back();
+    }
+
+    return sanitized.empty() ? "recording" : sanitized;
+}
+
+std::string makeUniqueRecordingPath(const std::string& dir, const std::string& name, const std::string& currentPath)
+{
+    const std::string base = sanitizeRecordingName(name);
+    for (int i = 0; i < 1000; ++i) {
+        std::ostringstream candidate;
+        candidate << dir << "/" << base;
+        if (i > 0) {
+            candidate << "_" << i;
+        }
+        candidate << ".wav";
+
+        const std::string path = candidate.str();
+        if (path == currentPath || access(path.c_str(), F_OK) != 0) {
+            return path;
+        }
+    }
+
+    return dir + "/" + base + ".wav";
 }
 
 const char* maResultName(ma_result result)
@@ -237,7 +313,7 @@ struct RecordingModel::Impl {
         return true;
     }
 
-    void stopRecording()
+    PendingRecordingFile stopRecording()
     {
         writing_enabled.store(false);
 
@@ -255,6 +331,13 @@ struct RecordingModel::Impl {
             spdlog::info("RecordingModel: stopped recording path={}, frames={}, duration={:.2f}s", path, frames,
                          duration_sec);
         }
+
+        PendingRecordingFile pending;
+        pending.active      = !path.empty();
+        pending.path        = path;
+        pending.name        = stripWavExtension(baseName(path));
+        pending.durationSec = static_cast<uint32_t>(std::round(duration_sec));
+        return pending;
     }
 
     bool startMonitor()
@@ -503,6 +586,11 @@ RecordingModel::~RecordingModel()
 
 void RecordingModel::start()
 {
+    if (_pending_recording.get().active) {
+        spdlog::info("RecordingModel: start ignored, pending recording requires confirmation");
+        return;
+    }
+
     if (_state.get() == RecordingState::Recording) {
         spdlog::info("RecordingModel: start ignored, already recording");
         return;
@@ -540,10 +628,13 @@ void RecordingModel::stop()
     }
 
     spdlog::info("RecordingModel: stop requested");
-    _impl->stopRecording();
+    PendingRecordingFile pending = _impl->stopRecording();
     _impl->armStartCooldown();
     _state.set(RecordingState::Idle);
     _elapsed_sec.set(0);
+    if (pending.active) {
+        _pending_recording.set(std::move(pending));
+    }
 }
 
 void RecordingModel::pause()
@@ -564,6 +655,44 @@ void RecordingModel::resume()
             _state.set(RecordingState::Recording);
         }
     }
+}
+
+bool RecordingModel::confirmPendingRecording(const std::string& name)
+{
+    PendingRecordingFile pending = _pending_recording.get();
+    if (!pending.active) {
+        return false;
+    }
+
+    const std::string dir      = directoryName(pending.path);
+    const std::string new_path = makeUniqueRecordingPath(dir, name, pending.path);
+
+    if (new_path != pending.path && std::rename(pending.path.c_str(), new_path.c_str()) != 0) {
+        spdlog::error("RecordingModel: rename pending recording failed, from={}, to={}, errno={}", pending.path,
+                      new_path, errno);
+        return false;
+    }
+
+    spdlog::info("RecordingModel: confirmed recording path={}", new_path);
+    _pending_recording.set(PendingRecordingFile{});
+    return true;
+}
+
+bool RecordingModel::discardPendingRecording()
+{
+    PendingRecordingFile pending = _pending_recording.get();
+    if (!pending.active) {
+        return false;
+    }
+
+    if (std::remove(pending.path.c_str()) != 0) {
+        spdlog::warn("RecordingModel: discard pending recording failed, path={}, errno={}", pending.path, errno);
+    } else {
+        spdlog::info("RecordingModel: discarded pending recording path={}", pending.path);
+    }
+
+    _pending_recording.set(PendingRecordingFile{});
+    return true;
 }
 
 void RecordingModel::tick(uint32_t nowMs)

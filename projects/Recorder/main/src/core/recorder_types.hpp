@@ -36,6 +36,13 @@ struct RecordingFile {
     uint32_t durationSec = 0;
 };
 
+struct PendingRecordingFile {
+    bool active = false;
+    std::string path;
+    std::string name;
+    uint32_t durationSec = 0;
+};
+
 const char* pageIdName(PageId page);
 const char* recordingStateName(RecordingState state);
 const char* playbackStateName(PlaybackState state);

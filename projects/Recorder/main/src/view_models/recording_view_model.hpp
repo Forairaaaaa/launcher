@@ -2,6 +2,7 @@
 
 #include "models/recording_model.hpp"
 #include "view_models/view_model.hpp"
+#include <string>
 
 namespace recorder {
 
@@ -45,14 +46,32 @@ public:
         return _model.elapsedSec();
     }
 
+    smooth_ui_toolkit::Observable<PendingRecordingFile>& pendingRecording()
+    {
+        return _model.pendingRecording();
+    }
+
+    smooth_ui_toolkit::Observable<std::string>& pendingRecordingName()
+    {
+        return _pending_recording_name;
+    }
+
     smooth_ui_toolkit::Observable<RecordingWaveformType>& waveformType()
     {
         return _waveform_type;
     }
 
+    void setPendingRecordingName(std::string name);
+    bool confirmPendingRecording();
+    bool discardPendingRecording();
+
 private:
     RecordingModel& _model;
     smooth_ui_toolkit::Observable<RecordingWaveformType> _waveform_type{RecordingWaveformType::Basic};
+    smooth_ui_toolkit::Observable<std::string> _pending_recording_name{""};
+    bool _pending_recording_active = false;
+
+    void syncPendingRecordingName();
 };
 
 }  // namespace recorder
