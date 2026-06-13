@@ -21,6 +21,7 @@ constexpr int32_t kMenuItemPitch         = 41;
 constexpr int32_t kMenuTextPaddingLeft   = 11;
 constexpr int32_t kMenuTextPaddingRight  = 11;
 constexpr int32_t kMenuSelectorRadius    = 8;
+constexpr int32_t kMenuCameraPaddingY    = 9;
 constexpr int32_t kDividerX              = 32;
 constexpr int32_t kDividerY              = 123;
 constexpr int32_t kDividerWidth          = 256;
@@ -209,17 +210,41 @@ private:
         _update_camera_keyframe();
     }
 
+    void _update_camera_keyframe() override
+    {
+        if (_data.option_list.empty()) {
+            return;
+        }
+
+        const auto& keyframe = getSelectedKeyframe();
+        getCamera().move(0, cameraYFor(keyframe));
+    }
+
     int32_t cameraYFor(const smooth_ui_toolkit::Vector4& keyframe)
     {
-        int32_t offset       = static_cast<int32_t>(std::round(getCameraOffset().y));
-        const int32_t top    = static_cast<int32_t>(std::round(keyframe.y));
-        const int32_t bottom = top + static_cast<int32_t>(std::round(keyframe.height));
-        if (top < offset) {
-            offset = top;
-        } else if (bottom > offset + kMenuHeight) {
-            offset = bottom - kMenuHeight;
+        int32_t offset           = static_cast<int32_t>(std::round(getCameraOffset().y));
+        const int32_t top        = static_cast<int32_t>(std::round(keyframe.y));
+        const int32_t bottom     = top + static_cast<int32_t>(std::round(keyframe.height));
+        const int32_t max_offset = maxCameraY();
+
+        if (top - offset < kMenuCameraPaddingY) {
+            offset = top - kMenuCameraPaddingY;
+        } else if (bottom - offset > kMenuHeight - kMenuCameraPaddingY) {
+            offset = bottom - kMenuHeight + kMenuCameraPaddingY;
         }
-        return std::max(0, offset);
+
+        return std::clamp(offset, 0, max_offset);
+    }
+
+    int32_t maxCameraY() const
+    {
+        if (_data.option_list.empty()) {
+            return 0;
+        }
+
+        const auto& keyframe         = _data.option_list.back().keyframe;
+        const int32_t content_bottom = static_cast<int32_t>(std::round(keyframe.y + keyframe.height));
+        return std::max(0, content_bottom + kMenuCameraPaddingY - kMenuHeight);
     }
 
     void setupAnimation()
