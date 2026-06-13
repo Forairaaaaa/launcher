@@ -4,6 +4,7 @@
 #include <core/animation/generators/generators.hpp>
 #include <core/color/color.hpp>
 #include <core/easing/ease.hpp>
+#include <lvgl/lvgl_cpp/canvas.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/number_flow/number_flow.hpp>
 #include <tools/ring_buffer/ring_buffer.hpp>
@@ -41,10 +42,21 @@ constexpr size_t kSiriWaveformCurveCount         = 3;
 constexpr size_t kSiriWaveformPointCount         = 96;
 constexpr float kSiriWaveformGraphX              = 22.0f;
 constexpr float kSiriWaveformAttFactor           = 4.0f;
-constexpr float kSiriWaveformGain                = 18.0f;
-constexpr float kSiriWaveformIdleAmp             = 0.22f;
+constexpr float kSiriWaveformGain                = 36.0f;
+constexpr float kSiriWaveformIdleAmp             = 0.44f;
 constexpr float kSiriWaveformMaxAmp              = 0.9f;
 constexpr float kSiriWaveformResponse            = 0.18f;
+constexpr float kSiriWaveformWidthScale          = 2.0f;
+constexpr float kSiriTwoPi                       = 6.2831853f;
+constexpr float kSiriPhaseSpeedScale             = 8.0f;
+constexpr float kSiriCurveFadeSpeed              = 3.0f;
+constexpr int32_t kSiriCanvasScale               = 1;
+constexpr int32_t kSiriRenderWidth               = kWaveformPanelWidth / kSiriCanvasScale;
+constexpr int32_t kSiriRenderHeight              = kWaveformPanelHeight / kSiriCanvasScale;
+constexpr uint8_t kSiriCanvasAlpha               = 255;
+constexpr int32_t kSiriEdgeFadeWidth             = 12;
+constexpr uint32_t kSiriCurveMinLifetimeMs       = 500;
+constexpr uint32_t kSiriCurveMaxLifetimeMs       = 1000;
 constexpr int32_t kDurationPanelWidth            = 70;
 constexpr int32_t kDurationPanelHeight           = 18;
 constexpr int32_t kDurationPanelX                = 0;
@@ -340,9 +352,21 @@ private:
 
 class SiriWaveformView : public RecordingWaveformViewBase {
 public:
-    explicit SiriWaveformView(lv_obj_t* parent) : RecordingWaveformViewBase(parent)
+    explicit SiriWaveformView(lv_obj_t* parent)
+        : RecordingWaveformViewBase(parent),
+          _canvas(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Canvas>(_panel->raw_ptr()))
     {
-        _panel->addEventCb(onDraw, LV_EVENT_DRAW_MAIN, this);
+        _canvas_buffer.resize(kWaveformPanelWidth * kWaveformPanelHeight);
+        lv_canvas_set_buffer(_canvas->raw_ptr(), _canvas_buffer.data(), kWaveformPanelWidth, kWaveformPanelHeight,
+                             LV_COLOR_FORMAT_ARGB8888);
+        _canvas->setSize(kWaveformPanelWidth, kWaveformPanelHeight);
+        _canvas->align(LV_ALIGN_CENTER, 0, 0);
+        _canvas->setBgOpa(LV_OPA_TRANSP);
+        _canvas->setBorderWidth(0);
+        _canvas->setPaddingAll(0);
+        _canvas->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        initPattern(static_cast<uint32_t>(lv_tick_get()) ^ static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this)));
+        renderCanvas();
     }
 
     void setFrame(const AudioFrame& frame) override
@@ -370,15 +394,17 @@ public:
         _target_amp *= std::pow(0.03f, dt * 4.0f);
 
         const float phase_dt = dt == 0.0f ? 0.016f : dt;
+        updatePattern(nowMs, phase_dt);
         for (auto& layer : _layers) {
             for (auto& curve : layer.curves) {
-                curve.phase += curve.speed * phase_dt;
-                if (curve.phase > 6.2831853f) {
-                    curve.phase -= 6.2831853f;
+                curve.phase += curve.speed * phase_dt * kSiriPhaseSpeedScale;
+                if (curve.phase > kSiriTwoPi) {
+                    curve.phase -= kSiriTwoPi;
                 }
             }
         }
 
+        renderCanvas();
         RecordingWaveformViewBase::tick(nowMs);
     }
 
@@ -392,20 +418,29 @@ private:
     };
 
     struct RuntimeCurve : public Curve {
-        float phase = 0.0f;
+        float final_amp     = 0.0f;
+        float phase         = 0.0f;
+        uint32_t despawn_ms = 0;
     };
 
     struct Layer {
-        lv_color_t color;
+        uint8_t r;
+        uint8_t g;
+        uint8_t b;
         std::array<RuntimeCurve, kSiriWaveformCurveCount> curves;
     };
 
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Canvas> _canvas;
+    std::vector<uint32_t> _canvas_buffer;
     float _target_amp      = 0.0f;
     float _display_amp     = 0.0f;
     uint32_t _last_tick_ms = 0;
+    uint32_t _random_state = 0xA53C9E2Du;
     std::array<Layer, kSiriWaveformLayerCount> _layers{{
         {
-            lv_color_hex(0x0F52A9),
+            15,
+            82,
+            169,
             {{
                 {0.90f, -1.8f, 1.70f, 1.25f, 1.0f},
                 {0.55f, 0.2f, 1.25f, 2.20f, -1.0f},
@@ -413,7 +448,9 @@ private:
             }},
         },
         {
-            lv_color_hex(0xAD394C),
+            173,
+            57,
+            76,
             {{
                 {0.75f, -2.6f, 1.35f, 1.55f, -1.0f},
                 {0.95f, -0.1f, 1.55f, 2.65f, 1.0f},
@@ -421,7 +458,9 @@ private:
             }},
         },
         {
-            lv_color_hex(0x30DC9B),
+            48,
+            220,
+            155,
             {{
                 {0.60f, -1.1f, 1.20f, 2.85f, 1.0f},
                 {0.85f, 1.1f, 1.65f, 1.45f, -1.0f},
@@ -442,7 +481,7 @@ private:
             const auto& curve = layer.curves[i];
             const float spread =
                 4.0f * (-1.0f + static_cast<float>(i) * 2.0f / static_cast<float>(layer.curves.size() - 1));
-            const float x = graph_x / curve.width - (spread + curve.offset);
+            const float x = graph_x / (curve.width * kSiriWaveformWidthScale) - (spread + curve.offset);
             y += std::abs(curve.amp * std::sin(curve.verse * x - curve.phase) * globalAtt(x));
         }
 
@@ -451,101 +490,178 @@ private:
         return relative * globalAtt((graph_x / kSiriWaveformGraphX) * 2.0f) * amp;
     }
 
-    void drawSiriLayer(lv_layer_t* layer, const lv_area_t& coords, const Layer& wave_layer)
+    uint32_t* canvasPixels()
     {
-        lv_draw_line_dsc_t line_dsc;
-        lv_draw_line_dsc_init(&line_dsc);
-        line_dsc.color       = wave_layer.color;
-        line_dsc.width       = 2;
-        line_dsc.round_start = 1;
-        line_dsc.round_end   = 1;
-        line_dsc.opa         = 160;
+        return _canvas_buffer.data();
+    }
 
-        const int32_t mid_y = coords.y1 + kWaveformPanelHeight / 2;
-        const float x_step =
-            static_cast<float>(kWaveformPanelWidth - 1) / static_cast<float>(kSiriWaveformPointCount - 1);
-        const float y_scale = static_cast<float>(kWaveformPanelHeight) * 1.8f;
+    static uint32_t packArgb(uint8_t r, uint8_t g, uint8_t b)
+    {
+        return (static_cast<uint32_t>(kSiriCanvasAlpha) << 24) | (static_cast<uint32_t>(r) << 16) |
+               (static_cast<uint32_t>(g) << 8) | b;
+    }
 
-        bool has_previous_top    = false;
-        bool has_previous_bottom = false;
-        lv_point_precise_t previous_top{};
-        lv_point_precise_t previous_bottom{};
+    static float softLayerAlpha(float height, float dist)
+    {
+        static constexpr float kEdgeSoftness = 1.25f;
+        if (height <= 0.0f || dist >= height + kEdgeSoftness) {
+            return 0.0f;
+        }
 
-        for (size_t i = 0; i < kSiriWaveformPointCount; ++i) {
-            const float ratio   = static_cast<float>(i) / static_cast<float>(kSiriWaveformPointCount - 1);
-            const float graph_x = ratio * kSiriWaveformGraphX * 2.0f - kSiriWaveformGraphX;
-            const float height  = layerHeight(wave_layer, graph_x) * y_scale;
-            const float x       = coords.x1 + x_step * static_cast<float>(i);
+        const float edge_coverage = std::clamp((height + kEdgeSoftness - dist) / kEdgeSoftness, 0.0f, 1.0f);
+        const float inner_dist    = std::min(dist, height);
+        const float t             = inner_dist / (height + 0.5f);
+        return std::clamp((1.0f - t * t) * edge_coverage, 0.0f, 1.0f);
+    }
 
-            lv_point_precise_t top{};
-            top.x = x;
-            top.y = static_cast<float>(mid_y) - height;
+    static uint32_t nextRandom(uint32_t& state)
+    {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        return state;
+    }
 
-            lv_point_precise_t bottom{};
-            bottom.x = x;
-            bottom.y = static_cast<float>(mid_y) + height;
+    static float randomRange(uint32_t& state, float min, float max)
+    {
+        const float unit = static_cast<float>(nextRandom(state) & 0xFFFF) / 65535.0f;
+        return min + (max - min) * unit;
+    }
 
-            line_dsc.opa = static_cast<lv_opa_t>((160 * edgeOpacity(i, kSiriWaveformPointCount)) / LV_OPA_COVER);
-            if (has_previous_top) {
-                line_dsc.p1 = previous_top;
-                line_dsc.p2 = top;
-                lv_draw_line(layer, &line_dsc);
+    bool randomBool()
+    {
+        return (nextRandom(_random_state) & 1u) != 0u;
+    }
+
+    uint32_t randomLifetimeMs()
+    {
+        return static_cast<uint32_t>(std::round(randomRange(_random_state, static_cast<float>(kSiriCurveMinLifetimeMs),
+                                                            static_cast<float>(kSiriCurveMaxLifetimeMs))));
+    }
+
+    void spawnLayer(Layer& layer, uint32_t nowMs)
+    {
+        const float layer_verse = randomBool() ? 1.0f : -1.0f;
+        for (auto& curve : layer.curves) {
+            curve.amp        = 0.0f;
+            curve.final_amp  = randomRange(_random_state, 0.3f, 1.0f);
+            curve.offset     = randomRange(_random_state, -3.0f, 3.0f);
+            curve.speed      = randomRange(_random_state, 0.5f, 1.0f);
+            curve.width      = randomRange(_random_state, 1.0f, 3.0f);
+            curve.verse      = randomRange(_random_state, 0.0f, 1.0f) < 0.15f ? -layer_verse : layer_verse;
+            curve.phase      = randomRange(_random_state, 0.0f, kSiriTwoPi);
+            curve.despawn_ms = nowMs + randomLifetimeMs();
+        }
+    }
+
+    void initPattern(uint32_t seed)
+    {
+        _random_state        = seed == 0 ? 0xA53C9E2Du : seed;
+        const uint32_t nowMs = lv_tick_get();
+        for (auto& layer : _layers) {
+            spawnLayer(layer, nowMs);
+        }
+    }
+
+    void updatePattern(uint32_t nowMs, float dt)
+    {
+        const float delta = kSiriCurveFadeSpeed * dt;
+        for (auto& layer : _layers) {
+            bool all_dead = true;
+            for (auto& curve : layer.curves) {
+                if (nowMs < curve.despawn_ms || curve.amp > 0.001f) {
+                    all_dead = false;
+                    break;
+                }
             }
-            if (has_previous_bottom) {
-                line_dsc.p1 = previous_bottom;
-                line_dsc.p2 = bottom;
-                lv_draw_line(layer, &line_dsc);
+            if (all_dead) {
+                spawnLayer(layer, nowMs);
             }
 
-            previous_top        = top;
-            previous_bottom     = bottom;
-            has_previous_top    = true;
-            has_previous_bottom = true;
+            for (auto& curve : layer.curves) {
+                if (nowMs >= curve.despawn_ms) {
+                    curve.amp = std::max(0.0f, curve.amp - delta);
+                } else {
+                    curve.amp = std::min(curve.final_amp, curve.amp + delta);
+                }
+            }
         }
     }
 
-    void drawSupportLine(lv_layer_t* layer, const lv_area_t& coords)
+    static float horizontalEdgeFade(int32_t x, int32_t width, int32_t fade_width)
     {
-        lv_draw_line_dsc_t line_dsc;
-        lv_draw_line_dsc_init(&line_dsc);
-        line_dsc.color = lv_color_hex(0xFFFFFF);
-        line_dsc.width = 1;
-
-        const int32_t mid_y = coords.y1 + kWaveformPanelHeight / 2;
-        const int32_t start_x =
-            coords.x1 + (kWaveformPanelWidth - ((kWaveformBarCount - 1) * kWaveformBarPitch + 1)) / 2;
-        for (size_t i = 0; i < kWaveformBarCount; ++i) {
-            const int32_t x = start_x + static_cast<int32_t>(i) * kWaveformBarPitch;
-            line_dsc.p1.x   = x;
-            line_dsc.p1.y   = mid_y;
-            line_dsc.p2.x   = x + 1;
-            line_dsc.p2.y   = mid_y;
-            line_dsc.opa    = static_cast<lv_opa_t>((70 * edgeOpacity(i, kWaveformBarCount)) / LV_OPA_COVER);
-            lv_draw_line(layer, &line_dsc);
+        const int32_t edge_dist = std::min(x, width - 1 - x);
+        if (edge_dist >= fade_width) {
+            return 1.0f;
         }
+
+        const float t = static_cast<float>(edge_dist + 1) / static_cast<float>(fade_width + 1);
+        return t * t * (3.0f - 2.0f * t);
     }
 
-    void draw(lv_event_t* event)
+    void renderCanvas()
     {
-        lv_layer_t* layer = lv_event_get_layer(event);
-        if (!layer) {
-            return;
+        static constexpr float kLayerAlpha = 0.78f;
+
+        std::array<std::array<float, kSiriRenderWidth>, kSiriWaveformLayerCount> heights{};
+        const float render_center_y = static_cast<float>(kSiriRenderHeight) * 0.5f;
+        const float y_scale         = static_cast<float>(kSiriRenderHeight) * 1.8f;
+
+        for (size_t layer_index = 0; layer_index < _layers.size(); ++layer_index) {
+            for (int32_t x = 0; x < kSiriRenderWidth; ++x) {
+                const float ratio       = static_cast<float>(x) / static_cast<float>(kSiriRenderWidth - 1);
+                const float graph_x     = ratio * kSiriWaveformGraphX * 2.0f - kSiriWaveformGraphX;
+                heights[layer_index][x] = layerHeight(_layers[layer_index], graph_x) * y_scale;
+            }
         }
 
-        lv_area_t coords;
-        lv_obj_get_coords(_panel->raw_ptr(), &coords);
+        uint32_t* pixels = canvasPixels();
+        for (int32_t y = 0; y < kSiriRenderHeight; ++y) {
+            const float dist = std::abs(static_cast<float>(y) - render_center_y);
+            for (int32_t x = 0; x < kSiriRenderWidth; ++x) {
+                const float edge_fade = horizontalEdgeFade(x, kSiriRenderWidth, kSiriEdgeFadeWidth);
+                uint32_t r            = 0;
+                uint32_t g            = 0;
+                uint32_t b            = 0;
 
-        drawSupportLine(layer, coords);
-        for (const auto& wave_layer : _layers) {
-            drawSiriLayer(layer, coords, wave_layer);
+                for (size_t layer_index = 0; layer_index < _layers.size(); ++layer_index) {
+                    const float height = heights[layer_index][x];
+                    const float alpha  = softLayerAlpha(height, dist) * kLayerAlpha * edge_fade;
+                    if (alpha <= 0.0f) {
+                        continue;
+                    }
+
+                    const auto& layer = _layers[layer_index];
+                    r                 = std::min<uint32_t>(255, r + static_cast<uint32_t>(layer.r * alpha));
+                    g                 = std::min<uint32_t>(255, g + static_cast<uint32_t>(layer.g * alpha));
+                    b                 = std::min<uint32_t>(255, b + static_cast<uint32_t>(layer.b * alpha));
+                }
+
+                if (y == kSiriRenderHeight / 2) {
+                    const uint32_t line = static_cast<uint32_t>(std::round(255.0f * edge_fade));
+                    r                   = std::max<uint32_t>(r, line);
+                    g                   = std::max<uint32_t>(g, line);
+                    b                   = std::max<uint32_t>(b, line);
+                }
+
+                const uint32_t color =
+                    packArgb(static_cast<uint8_t>(r), static_cast<uint8_t>(g), static_cast<uint8_t>(b));
+                writeScaledPixel(pixels, x, y, color);
+            }
         }
+
+        lv_obj_invalidate(_canvas->raw_ptr());
     }
 
-    static void onDraw(lv_event_t* event)
+    void writeScaledPixel(uint32_t* pixels, int32_t x, int32_t y, uint32_t color)
     {
-        auto* self = static_cast<SiriWaveformView*>(lv_event_get_user_data(event));
-        if (self) {
-            self->draw(event);
+        const int32_t out_x = x * kSiriCanvasScale;
+        const int32_t out_y = y * kSiriCanvasScale;
+        for (int32_t dy = 0; dy < kSiriCanvasScale; ++dy) {
+            uint32_t* row = pixels + (out_y + dy) * kWaveformPanelWidth + out_x;
+            for (int32_t dx = 0; dx < kSiriCanvasScale; ++dx) {
+                row[dx] = color;
+            }
         }
     }
 };
