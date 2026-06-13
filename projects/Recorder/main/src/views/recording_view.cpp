@@ -25,7 +25,7 @@ constexpr int32_t kWaveformMaxBarHeight      = 86;
 constexpr size_t kWaveformBarCount           = 86;
 constexpr uint32_t kWaveformHistoryMs        = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs = kWaveformHistoryMs / kWaveformBarCount;
-constexpr float kWaveformGain                = 8.0f;
+constexpr float kWaveformGain                = 4.0f;
 constexpr int32_t kDurationPanelWidth        = 70;
 constexpr int32_t kDurationPanelHeight       = 18;
 constexpr int32_t kDurationPanelX            = 0;
@@ -111,9 +111,9 @@ private:
         }
         _last_tick_ms = nowMs;
 
-        const float response = _target_amp >= _display_amp ? 0.42f : 0.16f;
+        const float response = _target_amp >= _display_amp ? 0.42f : 0.32f;
         _display_amp += (_target_amp - _display_amp) * response;
-        _target_amp *= std::pow(0.03f, dt);
+        _target_amp *= std::pow(0.03f, dt * 2.0f);
         if (_target_amp < 0.0005f) {
             _target_amp = 0.0f;
         }

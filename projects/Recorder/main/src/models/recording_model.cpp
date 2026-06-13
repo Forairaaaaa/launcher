@@ -213,7 +213,7 @@ struct RecordingModel::Impl {
         {
             std::lock_guard<std::mutex> lock(frame_mutex);
             latest_frame = AudioFrame{};
-            latest_frame.samples.assign(kPreviewSampleCount, 0.0f);
+            latest_frame.samples.assign(kPreviewSampleCount, 0.5f);
             has_new_frame = true;
         }
 
