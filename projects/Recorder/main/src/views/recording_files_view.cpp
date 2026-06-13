@@ -33,6 +33,14 @@ constexpr uint32_t kDividerColor          = 0x2B2B2B;
 constexpr uint32_t kSelectorColor         = 0x2E2E2E;
 constexpr uint32_t kTextColor             = 0xFFFFFF;
 constexpr uint32_t kEmptyTextColor        = 0x666666;
+constexpr int32_t kScrollBarX             = 301;
+constexpr int32_t kScrollBarY             = 12;
+constexpr int32_t kScrollBarWidth         = 3;
+constexpr int32_t kScrollBarHeight        = 100;
+constexpr int32_t kScrollBarThumbHeight   = 14;
+constexpr int32_t kScrollBarRadius        = 1;
+constexpr uint32_t kScrollBarColor        = 0x2B2B2B;
+constexpr uint32_t kScrollBarThumbColor   = 0x848484;
 constexpr int32_t kDeleteDialogWidth      = 258;
 constexpr int32_t kDeleteDialogHeight     = 100;
 constexpr int32_t kDeleteDialogY          = -21;
@@ -116,7 +124,9 @@ public:
     explicit RecordingFilesMenu(lv_obj_t* parent)
         : _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent)),
           _selector(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
-          _empty_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr()))
+          _empty_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr())),
+          _scroll_bar(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
+          _scroll_thumb(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr()))
     {
         _panel->setSize(kMenuWidth, kMenuHeight);
         _panel->align(LV_ALIGN_TOP_MID, 0, 0);
@@ -144,6 +154,7 @@ public:
         _empty_label->align(LV_ALIGN_CENTER, 0, -8);
         _empty_label->addFlag(LV_OBJ_FLAG_HIDDEN);
 
+        setupScrollBar();
         setupAnimation();
         setConfig().moveInLoop        = true;
         setConfig().renderInterval    = kMenuRenderIntervalMs;
@@ -160,6 +171,8 @@ public:
         if (files.empty()) {
             _selector->addFlag(LV_OBJ_FLAG_HIDDEN);
             _empty_label->removeFlag(LV_OBJ_FLAG_HIDDEN);
+            _scroll_bar->addFlag(LV_OBJ_FLAG_HIDDEN);
+            _scroll_thumb->addFlag(LV_OBJ_FLAG_HIDDEN);
             return;
         }
 
@@ -230,6 +243,8 @@ private:
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _selector;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _empty_label;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _scroll_bar;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _scroll_thumb;
     std::vector<std::unique_ptr<Row>> _rows;
 
     int clampIndex(int index) const
@@ -297,6 +312,31 @@ private:
         return std::max(0, content_bottom + kMenuCameraPaddingY - kMenuHeight);
     }
 
+    void setupScrollBar()
+    {
+        _scroll_bar->setSize(kScrollBarWidth, kScrollBarHeight);
+        _scroll_bar->setPos(kScrollBarX, kScrollBarY);
+        _scroll_bar->setBgColor(lv_color_hex(kScrollBarColor));
+        _scroll_bar->setBgOpa(LV_OPA_COVER);
+        _scroll_bar->setRadius(kScrollBarRadius);
+        _scroll_bar->setBorderWidth(0);
+        _scroll_bar->setShadowWidth(0);
+        _scroll_bar->setPaddingAll(0);
+        _scroll_bar->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _scroll_bar->addFlag(LV_OBJ_FLAG_HIDDEN);
+
+        _scroll_thumb->setSize(kScrollBarWidth, kScrollBarThumbHeight);
+        _scroll_thumb->setPos(kScrollBarX, kScrollBarY);
+        _scroll_thumb->setBgColor(lv_color_hex(kScrollBarThumbColor));
+        _scroll_thumb->setBgOpa(LV_OPA_COVER);
+        _scroll_thumb->setRadius(kScrollBarRadius);
+        _scroll_thumb->setBorderWidth(0);
+        _scroll_thumb->setShadowWidth(0);
+        _scroll_thumb->setPaddingAll(0);
+        _scroll_thumb->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _scroll_thumb->addFlag(LV_OBJ_FLAG_HIDDEN);
+    }
+
     void setupAnimation()
     {
         auto& selector_position_options          = getSelectorPostion().x.springOptions();
@@ -332,6 +372,27 @@ private:
             row.container->setPos(static_cast<int32_t>(std::round(keyframe.x)) + camera_x_offset,
                                   static_cast<int32_t>(std::round(keyframe.y)) + camera_y_offset);
         }
+
+        renderScrollBar();
+    }
+
+    void renderScrollBar()
+    {
+        const int32_t max_offset = maxCameraY();
+        if (max_offset <= 0) {
+            _scroll_bar->addFlag(LV_OBJ_FLAG_HIDDEN);
+            _scroll_thumb->addFlag(LV_OBJ_FLAG_HIDDEN);
+            return;
+        }
+
+        const float offset         = std::clamp(getCameraOffset().y, 0.0f, static_cast<float>(max_offset));
+        const float progress       = offset / static_cast<float>(max_offset);
+        const int32_t thumb_travel = kScrollBarHeight - kScrollBarThumbHeight;
+        const int32_t thumb_y      = kScrollBarY + static_cast<int32_t>(std::round(progress * thumb_travel));
+
+        _scroll_bar->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _scroll_thumb->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _scroll_thumb->setPos(kScrollBarX, thumb_y);
     }
 };
 
