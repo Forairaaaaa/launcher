@@ -27,6 +27,7 @@ constexpr ma_uint32 kCaptureChannels   = 1;
 constexpr ma_uint32 kCaptureSampleRate = 48000;
 constexpr ma_format kCaptureFormat     = ma_format_f32;
 constexpr size_t kPreviewSampleCount   = 24;
+constexpr auto kStartCooldown          = std::chrono::milliseconds(800);
 
 std::string makeRecordingPath()
 {
@@ -94,6 +95,7 @@ struct RecordingModel::Impl {
     AudioFrame latest_frame;
     bool has_new_frame = false;
     std::atomic<uint64_t> captured_frames{0};
+    std::chrono::steady_clock::time_point next_start_time{};
 
     ~Impl()
     {
@@ -229,6 +231,21 @@ struct RecordingModel::Impl {
             return 0;
         }
         return static_cast<uint32_t>(captured_frames.load() / kCaptureSampleRate);
+    }
+
+    uint32_t startCooldownRemainingMs() const
+    {
+        auto now = std::chrono::steady_clock::now();
+        if (now >= next_start_time) {
+            return 0;
+        }
+        return static_cast<uint32_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(next_start_time - now).count());
+    }
+
+    void armStartCooldown()
+    {
+        next_start_time = std::chrono::steady_clock::now() + kStartCooldown;
     }
 
     void cleanup()
@@ -382,11 +399,18 @@ void RecordingModel::start()
         stop();
     }
 
+    uint32_t remaining_ms = _impl->startCooldownRemainingMs();
+    if (remaining_ms > 0) {
+        spdlog::info("RecordingModel: start ignored, cooldownRemaining={}ms", remaining_ms);
+        return;
+    }
+
     spdlog::info("RecordingModel: start requested");
     if (_impl->start()) {
         _elapsed_sec.set(0);
         _state.set(RecordingState::Recording);
     } else {
+        _impl->armStartCooldown();
         _state.set(RecordingState::Idle);
         _mic_amp.set(0.0f);
         _frame.set(AudioFrame{});
@@ -406,6 +430,7 @@ void RecordingModel::stop()
 
     spdlog::info("RecordingModel: stop requested");
     _impl->stop();
+    _impl->armStartCooldown();
     _state.set(RecordingState::Idle);
     _mic_amp.set(0.0f);
     _frame.set(AudioFrame{});
