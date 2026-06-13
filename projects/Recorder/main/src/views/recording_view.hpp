@@ -3,7 +3,6 @@
 #include "view_models/recording_view_model.hpp"
 #include "views/bottom_key_bar.hpp"
 #include "views/view.hpp"
-#include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/lvgl_cpp/obj.hpp>
 #include <cstddef>
 #include <memory>
@@ -24,11 +23,12 @@ public:
 
 private:
     class DurationPanel;
+    class PausedLabel;
 
     RecordingViewModel& _view_model;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _root;
     std::unique_ptr<DurationPanel> _duration_panel;
-    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _paused_label;
+    std::unique_ptr<PausedLabel> _paused_label;
     std::unique_ptr<BottomKeyBar> _key_bar;
     size_t _state_observer_id   = 0;
     size_t _elapsed_observer_id = 0;

@@ -2,8 +2,10 @@
 #include "assets/assets.h"
 #include <core/animation/animate_value/animate_value.hpp>
 #include <core/animation/generators/generators.hpp>
+#include <core/easing/ease.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/number_flow/number_flow.hpp>
+#include <algorithm>
 #include <cmath>
 
 namespace recorder {
@@ -18,6 +20,7 @@ constexpr int32_t kDurationPanelHiddenWidth = 18;
 constexpr int32_t kDurationPanelHiddenY     = 64;
 constexpr int32_t kPausedLabelX             = 0;
 constexpr int32_t kPausedLabelY             = 14;
+constexpr float kPausedLabelFadeDuration    = 0.3f;
 
 }  // namespace
 
@@ -139,6 +142,59 @@ private:
     }
 };
 
+class RecordingView::PausedLabel {
+public:
+    explicit PausedLabel(lv_obj_t* parent)
+        : _label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(parent)), _opacity(0)
+    {
+        _opacity.easingOptions().duration       = kPausedLabelFadeDuration;
+        _opacity.easingOptions().easingFunction = smooth_ui_toolkit::ease::ease_out_quad;
+
+        _label->setText("-PAUSED-");
+        _label->setTextFont(&font_chivo_mono_medium_12);
+        _label->setTextColor(lv_color_hex(0xF0544D));
+        _label->setTextAlign(LV_TEXT_ALIGN_CENTER);
+        _label->align(LV_ALIGN_CENTER, kPausedLabelX, kPausedLabelY);
+        _label->setOpa(0);
+        _label->addFlag(LV_OBJ_FLAG_HIDDEN);
+    }
+
+    void setVisible(bool visible)
+    {
+        if (_visible == visible) {
+            return;
+        }
+
+        _visible = visible;
+        if (_visible) {
+            _label->removeFlag(LV_OBJ_FLAG_HIDDEN);
+            _opacity.move(255);
+        } else {
+            _opacity.move(0);
+        }
+    }
+
+    void tick()
+    {
+        _opacity.update();
+        _label->setOpa(toOpa(_opacity.directValue()));
+
+        if (!_visible && _opacity.done() && _opacity.directValue() <= 0.0f) {
+            _label->addFlag(LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+private:
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _label;
+    smooth_ui_toolkit::AnimateValue _opacity;
+    bool _visible = false;
+
+    static lv_opa_t toOpa(float value)
+    {
+        return static_cast<lv_opa_t>(std::clamp(static_cast<int>(std::round(value)), 0, 255));
+    }
+};
+
 RecordingView::RecordingView(RecordingViewModel& view_model) : _view_model(view_model)
 {
 }
@@ -162,14 +218,7 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
     _duration_panel = std::make_unique<DurationPanel>(_root->raw_ptr());
-
-    _paused_label = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_root->raw_ptr());
-    _paused_label->setText("-PAUSED-");
-    _paused_label->setTextFont(&font_chivo_mono_medium_12);
-    _paused_label->setTextColor(lv_color_hex(0xF0544D));
-    _paused_label->setTextAlign(LV_TEXT_ALIGN_CENTER);
-    _paused_label->align(LV_ALIGN_CENTER, kPausedLabelX, kPausedLabelY);
-    _paused_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+    _paused_label   = std::make_unique<PausedLabel>(_root->raw_ptr());
 
     _key_bar             = std::make_unique<BottomKeyBar>(_root->raw_ptr());
     _state_observer_id   = _view_model.state().observe(this, onStateChanged);
@@ -200,6 +249,12 @@ void RecordingView::tick(uint32_t nowMs)
     if (_duration_panel) {
         _duration_panel->tick();
     }
+    if (_paused_label) {
+        _paused_label->tick();
+    }
+    if (_key_bar) {
+        _key_bar->tick();
+    }
 }
 
 void RecordingView::renderState(RecordingState state)
@@ -214,7 +269,7 @@ void RecordingView::renderState(RecordingState state)
                 _duration_panel->setVisible(false);
             }
             if (_paused_label) {
-                _paused_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+                _paused_label->setVisible(false);
             }
             _key_bar->setItems({
                 {'6', &image_icon_record},
@@ -226,7 +281,7 @@ void RecordingView::renderState(RecordingState state)
                 _duration_panel->setVisible(true);
             }
             if (_paused_label) {
-                _paused_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+                _paused_label->setVisible(false);
             }
             _key_bar->setItems({
                 {'5', &image_icon_pause},
@@ -239,7 +294,7 @@ void RecordingView::renderState(RecordingState state)
                 _duration_panel->setVisible(true);
             }
             if (_paused_label) {
-                _paused_label->removeFlag(LV_OBJ_FLAG_HIDDEN);
+                _paused_label->setVisible(true);
             }
             _key_bar->setItems({
                 {'5', &image_icon_record},
