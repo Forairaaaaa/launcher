@@ -15,20 +15,6 @@
             ]
         },
         {
-            "name": "font_chivo_medium_12",
-            "source": "Chivo-Medium.ttf",
-            "args": [
-                "--no-compress",
-                "--no-prefilter",
-                "--force-fast-kern-format"
-            ],
-            "size": 12,
-            "bpp": 4,
-            "ranges": [
-                "0x20-0x7E"
-            ]
-        },
-        {
             "name": "font_chivo_medium_14",
             "source": "Chivo-Medium.ttf",
             "args": [
