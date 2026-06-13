@@ -980,7 +980,7 @@ public:
         configureOpenAnimation();
 
         applyAnimatedValue();
-        _panel->setBgColor(lv_color_hex(0x2D2D2D));
+        _panel->setBgColor(lv_color_hex(0x474747));
         _panel->setBgOpa(LV_OPA_COVER);
         _panel->setRadius(kFileDialogRadius);
         _panel->setBorderWidth(0);
@@ -1089,10 +1089,10 @@ private:
 
     void configureCloseAnimation()
     {
-        setupAnimation(_x, 0.5, 0.18f);
-        setupAnimation(_y, 0.6, 0.18f);
-        setupAnimation(_width, 0.5, 0.12f);
-        setupAnimation(_height, 0.5, 0.12f);
+        setupAnimation(_x, 0.4, 0.18f);
+        setupAnimation(_y, 0.5, 0.18f);
+        setupAnimation(_width, 0.4, 0.12f);
+        setupAnimation(_height, 0.4, 0.12f);
         _y.delay = 0.2;
     }
 
@@ -1127,9 +1127,9 @@ private:
     {
         _prompt_label->setText("Save recording as");
         _prompt_label->setTextFont(&font_chivo_medium_14);
-        _prompt_label->setTextColor(lv_color_hex(0x888888));
+        _prompt_label->setTextColor(lv_color_hex(0xA1A1A1));
         _prompt_label->setTextAlign(LV_TEXT_ALIGN_LEFT);
-        _prompt_label->setSize(kFileNameAreaWidth, LV_SIZE_CONTENT);
+        _prompt_label->setSize(230, LV_SIZE_CONTENT);
         _prompt_label->align(LV_ALIGN_CENTER, kFilePromptCenterX, kFilePromptCenterY);
     }
 
@@ -1137,7 +1137,7 @@ private:
     {
         _input->setSize(kFileNameAreaWidth, kFileNameAreaHeight);
         _input->align(LV_ALIGN_CENTER, kFileNameAreaCenterX, kFileNameAreaCenterY);
-        _input->setBgColor(lv_color_hex(0x494949));
+        _input->setBgColor(lv_color_hex(0x676767));
         _input->setBgOpa(LV_OPA_COVER);
         _input->setRadius(kFileNameAreaRadius);
         _input->setBorderWidth(0);
