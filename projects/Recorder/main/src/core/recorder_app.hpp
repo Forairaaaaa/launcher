@@ -6,6 +6,7 @@
 #include "view_models/files_view_model.hpp"
 #include "view_models/playback_view_model.hpp"
 #include "view_models/recording_view_model.hpp"
+#include "views/recording_files_view.hpp"
 #include "views/recording_view.hpp"
 #include "views/view.hpp"
 #include <lvgl.h>
@@ -39,6 +40,7 @@ private:
     FilesViewModel _files_vm;
     PlaybackViewModel _playback_vm;
     RecordingView _recording_view;
+    RecordingFilesView _recording_files_view;
     ViewModel* _current_vm    = nullptr;
     View* _current_view       = nullptr;
     lv_group_t* _input_group  = nullptr;

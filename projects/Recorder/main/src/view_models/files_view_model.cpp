@@ -10,7 +10,10 @@ FilesViewModel::FilesViewModel(RecorderRouter& router, RecordingFilesModel& file
 
 void FilesViewModel::onEnter()
 {
-    spdlog::info("FilesViewModel enter");
+    const bool preserve_selection  = _preserve_selection_next_enter;
+    _preserve_selection_next_enter = false;
+    spdlog::info("FilesViewModel enter, preserveSelection={}", preserve_selection);
+    _files_model.refresh(preserve_selection);
 }
 
 void FilesViewModel::onKey(uint32_t key)
@@ -29,6 +32,7 @@ void FilesViewModel::onKey(uint32_t key)
             const RecordingFile* selected = _files_model.selectedFile();
             if (selected) {
                 _playback_model.load(*selected);
+                _preserve_selection_next_enter = true;
                 _router.push(PageId::Playback);
             }
             break;

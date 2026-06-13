@@ -31,6 +31,7 @@ public:
 private:
     RecordingFilesModel& _files_model;
     PlaybackModel& _playback_model;
+    bool _preserve_selection_next_enter = false;
 };
 
 }  // namespace recorder

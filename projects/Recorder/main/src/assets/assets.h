@@ -16,9 +16,14 @@ extern "C" {
 
 /* Images */
 LV_IMAGE_DECLARE(image_icon_basic_wave);
+LV_IMAGE_DECLARE(image_icon_delete);
 LV_IMAGE_DECLARE(image_icon_line_wave);
 LV_IMAGE_DECLARE(image_icon_list);
+LV_IMAGE_DECLARE(image_icon_nav_back);
+LV_IMAGE_DECLARE(image_icon_nav_down);
+LV_IMAGE_DECLARE(image_icon_nav_up);
 LV_IMAGE_DECLARE(image_icon_pause);
+LV_IMAGE_DECLARE(image_icon_play);
 LV_IMAGE_DECLARE(image_icon_prism_wave);
 LV_IMAGE_DECLARE(image_icon_record);
 LV_IMAGE_DECLARE(image_icon_spectrum_wave);

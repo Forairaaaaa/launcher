@@ -1,0 +1,366 @@
+#include "views/recording_files_view.hpp"
+#include "assets/assets.h"
+#include <lvgl/lvgl_cpp/label.hpp>
+#include <widget/select_menu/smooth_selector.hpp>
+#include <algorithm>
+#include <cmath>
+#include <string>
+
+namespace recorder {
+
+namespace {
+
+constexpr int32_t kMenuWidth             = 320;
+constexpr int32_t kMenuHeight            = 123;
+constexpr int32_t kMenuSelectedX         = 27;
+constexpr int32_t kMenuSelectedY         = 9;
+constexpr int32_t kMenuItemMinWidth      = 82;
+constexpr int32_t kMenuItemMaxWidth      = 262;
+constexpr int32_t kMenuItemHeight        = 24;
+constexpr int32_t kMenuItemPitch         = 41;
+constexpr int32_t kMenuTextPaddingLeft   = 11;
+constexpr int32_t kMenuTextPaddingRight  = 11;
+constexpr int32_t kMenuSelectorRadius    = 8;
+constexpr int32_t kDividerX              = 32;
+constexpr int32_t kDividerY              = 123;
+constexpr int32_t kDividerWidth          = 256;
+constexpr int32_t kDividerHeight         = 2;
+constexpr uint32_t kDividerColor         = 0x2B2B2B;
+constexpr uint32_t kSelectorColor        = 0x2E2E2E;
+constexpr uint32_t kTextColor            = 0xFFFFFF;
+constexpr uint32_t kEmptyTextColor       = 0x666666;
+constexpr float kSelectorMoveDuration    = 0.32f;
+constexpr float kSelectorMoveBounce      = 0.30f;
+constexpr float kSelectorShapeDuration   = 0.30f;
+constexpr float kSelectorShapeBounce     = 0.18f;
+constexpr float kCameraDuration          = 0.44f;
+constexpr uint32_t kMenuRenderIntervalMs = 16;
+
+std::string fileDisplayName(const RecordingFile& file)
+{
+    const size_t slash = file.path.find_last_of("/\\");
+    if (slash == std::string::npos) {
+        return file.path;
+    }
+    return file.path.substr(slash + 1);
+}
+
+int32_t textWidth(const std::string& text)
+{
+    lv_point_t size{};
+    lv_text_get_size(&size, text.c_str(), &font_chivo_medium_14, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return size.x;
+}
+
+int32_t optionWidth(const std::string& text)
+{
+    return std::clamp(textWidth(text) + kMenuTextPaddingLeft + kMenuTextPaddingRight, kMenuItemMinWidth,
+                      kMenuItemMaxWidth);
+}
+
+}  // namespace
+
+class RecordingFilesMenu : public smooth_ui_toolkit::SmoothSelectorMenu {
+public:
+    explicit RecordingFilesMenu(lv_obj_t* parent)
+        : _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent)),
+          _selector(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
+          _empty_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr()))
+    {
+        _panel->setSize(kMenuWidth, kMenuHeight);
+        _panel->align(LV_ALIGN_TOP_MID, 0, 0);
+        _panel->setBgOpa(LV_OPA_TRANSP);
+        _panel->setBorderWidth(0);
+        _panel->setShadowWidth(0);
+        _panel->setPaddingAll(0);
+        _panel->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+        _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+        _selector->setBgColor(lv_color_hex(kSelectorColor));
+        _selector->setBgOpa(LV_OPA_COVER);
+        _selector->setRadius(kMenuSelectorRadius);
+        _selector->setBorderWidth(0);
+        _selector->setShadowWidth(0);
+        _selector->setPaddingAll(0);
+        _selector->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _selector->addFlag(LV_OBJ_FLAG_HIDDEN);
+
+        _empty_label->setText("No recordings");
+        _empty_label->setTextFont(&font_chivo_medium_14);
+        _empty_label->setTextColor(lv_color_hex(kEmptyTextColor));
+        _empty_label->setTextAlign(LV_TEXT_ALIGN_CENTER);
+        _empty_label->setSize(kMenuWidth, LV_SIZE_CONTENT);
+        _empty_label->align(LV_ALIGN_CENTER, 0, -8);
+        _empty_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+
+        setupAnimation();
+        setConfig().moveInLoop        = true;
+        setConfig().renderInterval    = kMenuRenderIntervalMs;
+        setConfig().readInputInterval = 0;
+        setCameraSize(kMenuWidth, kMenuHeight);
+    }
+
+    void setFiles(const std::vector<RecordingFile>& files, int selectedIndex)
+    {
+        _rows.clear();
+        _data.option_list.clear();
+        _data.selected_option_index = 0;
+
+        if (files.empty()) {
+            _selector->addFlag(LV_OBJ_FLAG_HIDDEN);
+            _empty_label->removeFlag(LV_OBJ_FLAG_HIDDEN);
+            return;
+        }
+
+        _selector->removeFlag(LV_OBJ_FLAG_HIDDEN);
+        _empty_label->addFlag(LV_OBJ_FLAG_HIDDEN);
+
+        _rows.reserve(files.size());
+        for (size_t i = 0; i < files.size(); ++i) {
+            std::string name    = fileDisplayName(files[i]);
+            const int32_t width = optionWidth(name);
+            addOption({{static_cast<float>(kMenuSelectedX),
+                        static_cast<float>(kMenuSelectedY + static_cast<int32_t>(i) * kMenuItemPitch),
+                        static_cast<float>(width), static_cast<float>(kMenuItemHeight)},
+                       nullptr});
+            _rows.push_back(std::make_unique<Row>(_panel->raw_ptr(), std::move(name), width));
+        }
+
+        jumpToInstant(clampIndex(selectedIndex));
+        render();
+    }
+
+    void setSelectedIndex(int index)
+    {
+        if (_data.option_list.empty()) {
+            return;
+        }
+        moveToWithCamera(clampIndex(index));
+    }
+
+    void update(uint32_t nowMs) override
+    {
+        smooth_ui_toolkit::SmoothSelectorMenu::update(nowMs);
+        if (!_data.option_list.empty()) {
+            render();
+        }
+    }
+
+private:
+    struct Row {
+        Row(lv_obj_t* parent, std::string name, int32_t width)
+            : container(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent)),
+              label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(container->raw_ptr())),
+              itemWidth(width),
+              text(std::move(name))
+        {
+            container->setSize(itemWidth, kMenuItemHeight);
+            container->setBgOpa(LV_OPA_TRANSP);
+            container->setBorderWidth(0);
+            container->setShadowWidth(0);
+            container->setPaddingAll(0);
+            container->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+            container->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+            label->setText(text);
+            label->setTextFont(&font_chivo_medium_14);
+            label->setTextColor(lv_color_hex(kTextColor));
+            label->setLongMode(LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+            label->setSize(itemWidth - kMenuTextPaddingLeft - kMenuTextPaddingRight, LV_SIZE_CONTENT);
+            label->align(LV_ALIGN_LEFT_MID, kMenuTextPaddingLeft, 0);
+        }
+
+        std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> container;
+        std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> label;
+        int32_t itemWidth = 0;
+        std::string text;
+    };
+
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _selector;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _empty_label;
+    std::vector<std::unique_ptr<Row>> _rows;
+
+    int clampIndex(int index) const
+    {
+        if (_data.option_list.empty()) {
+            return 0;
+        }
+        return std::clamp(index, 0, static_cast<int>(_data.option_list.size()) - 1);
+    }
+
+    void jumpToInstant(int index)
+    {
+        if (_data.option_list.empty()) {
+            return;
+        }
+
+        _data.selected_option_index = clampIndex(index);
+        const auto& keyframe        = _data.option_list[_data.selected_option_index].keyframe;
+        getSelectorPostion().teleport(keyframe.x, keyframe.y);
+        getSelectorShape().teleport(keyframe.width, keyframe.height);
+        getCamera().teleport(0, cameraYFor(keyframe));
+    }
+
+    void moveToWithCamera(int index)
+    {
+        _data.selected_option_index = clampIndex(index);
+        _update_selector_keyframe();
+        _update_camera_keyframe();
+    }
+
+    int32_t cameraYFor(const smooth_ui_toolkit::Vector4& keyframe)
+    {
+        int32_t offset       = static_cast<int32_t>(std::round(getCameraOffset().y));
+        const int32_t top    = static_cast<int32_t>(std::round(keyframe.y));
+        const int32_t bottom = top + static_cast<int32_t>(std::round(keyframe.height));
+        if (top < offset) {
+            offset = top;
+        } else if (bottom > offset + kMenuHeight) {
+            offset = bottom - kMenuHeight;
+        }
+        return std::max(0, offset);
+    }
+
+    void setupAnimation()
+    {
+        auto& selector_position_options          = getSelectorPostion().x.springOptions();
+        selector_position_options.visualDuration = kSelectorMoveDuration;
+        selector_position_options.bounce         = kSelectorMoveBounce;
+        getSelectorPostion().y.springOptions()   = selector_position_options;
+
+        auto& selector_shape_options          = getSelectorShape().x.springOptions();
+        selector_shape_options.visualDuration = kSelectorShapeDuration;
+        selector_shape_options.bounce         = kSelectorShapeBounce;
+        getSelectorShape().y.springOptions()  = selector_shape_options;
+
+        auto& camera_options          = getCamera().y.springOptions();
+        camera_options.visualDuration = kCameraDuration;
+        camera_options.bounce         = 0.0f;
+        getCamera().x.springOptions() = camera_options;
+    }
+
+    void render()
+    {
+        const auto selector = getSelectorCurrentFrame();
+        _selector->setSize(static_cast<int32_t>(std::round(selector.width)),
+                           static_cast<int32_t>(std::round(selector.height)));
+        const int32_t camera_x_offset = -static_cast<int32_t>(std::round(getCameraOffset().x));
+        const int32_t camera_y_offset = -static_cast<int32_t>(std::round(getCameraOffset().y));
+        _selector->setPos(static_cast<int32_t>(std::round(selector.x)) + camera_x_offset,
+                          static_cast<int32_t>(std::round(selector.y)) + camera_y_offset);
+
+        for (size_t i = 0; i < _rows.size() && i < _data.option_list.size(); ++i) {
+            const auto& keyframe = _data.option_list[i].keyframe;
+            auto& row            = *_rows[i];
+            row.container->setSize(row.itemWidth, kMenuItemHeight);
+            row.container->setPos(static_cast<int32_t>(std::round(keyframe.x)) + camera_x_offset,
+                                  static_cast<int32_t>(std::round(keyframe.y)) + camera_y_offset);
+        }
+    }
+};
+
+RecordingFilesView::RecordingFilesView(FilesViewModel& view_model) : _view_model(view_model)
+{
+}
+
+RecordingFilesView::~RecordingFilesView()
+{
+    onExit();
+}
+
+void RecordingFilesView::onEnter(lv_obj_t* parent)
+{
+    onExit();
+
+    _root = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent);
+    _root->setSize(lv_pct(100), lv_pct(100));
+    _root->setBgColor(lv_color_hex(0x000000));
+    _root->setBgOpa(LV_OPA_COVER);
+    _root->setBorderWidth(0);
+    _root->setPaddingAll(0);
+    _root->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+    _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _menu = std::make_unique<RecordingFilesMenu>(_root->raw_ptr());
+
+    _divider = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_root->raw_ptr());
+    _divider->setSize(kDividerWidth, kDividerHeight);
+    _divider->setPos(kDividerX, kDividerY);
+    _divider->setBgColor(lv_color_hex(kDividerColor));
+    _divider->setBgOpa(LV_OPA_COVER);
+    _divider->setBorderWidth(0);
+    _divider->setRadius(0);
+    _divider->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
+    _key_bar->setItems({
+        {'4', &image_icon_nav_back},
+        {'5', &image_icon_nav_up},
+        {'6', &image_icon_nav_down},
+        {'7', &image_icon_play},
+        {'8', &image_icon_delete},
+    });
+
+    _files_observer_id          = _view_model.files().observe(this, onFilesChanged);
+    _selected_index_observer_id = _view_model.selectedIndex().observe(this, onSelectedIndexChanged);
+}
+
+void RecordingFilesView::onExit()
+{
+    if (_selected_index_observer_id != 0) {
+        _view_model.selectedIndex().removeObserver(_selected_index_observer_id);
+        _selected_index_observer_id = 0;
+    }
+    if (_files_observer_id != 0) {
+        _view_model.files().removeObserver(_files_observer_id);
+        _files_observer_id = 0;
+    }
+
+    _key_bar.reset();
+    _divider.reset();
+    _menu.reset();
+    _root.reset();
+}
+
+void RecordingFilesView::tick(uint32_t nowMs)
+{
+    if (_menu) {
+        _menu->update(nowMs);
+    }
+    if (_key_bar) {
+        _key_bar->tick();
+    }
+}
+
+void RecordingFilesView::renderFiles(const std::vector<RecordingFile>& files)
+{
+    if (_menu) {
+        _menu->setFiles(files, _view_model.selectedIndex().get());
+    }
+}
+
+void RecordingFilesView::renderSelectedIndex(int index)
+{
+    if (_menu) {
+        _menu->setSelectedIndex(index);
+    }
+}
+
+void RecordingFilesView::onFilesChanged(void* context, const std::vector<RecordingFile>& files)
+{
+    auto* self = static_cast<RecordingFilesView*>(context);
+    if (self) {
+        self->renderFiles(files);
+    }
+}
+
+void RecordingFilesView::onSelectedIndexChanged(void* context, const int& index)
+{
+    auto* self = static_cast<RecordingFilesView*>(context);
+    if (self) {
+        self->renderSelectedIndex(index);
+    }
+}
+
+}  // namespace recorder
