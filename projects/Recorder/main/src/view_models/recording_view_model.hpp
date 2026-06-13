@@ -8,7 +8,7 @@ namespace recorder {
 enum class RecordingWaveformType {
     Basic,
     Line,
-    Siri,
+    Prism,
 };
 
 class RecordingViewModel : public ViewModel {

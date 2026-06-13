@@ -37,28 +37,28 @@ constexpr uint32_t kWaveformHistoryMs            = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs     = kWaveformHistoryMs / kWaveformBarCount;
 constexpr uint32_t kLineWaveformSampleIntervalMs = kWaveformHistoryMs / kLineWaveformPointCount;
 constexpr float kWaveformGain                    = 8.0f;
-constexpr size_t kSiriWaveformLayerCount         = 3;
-constexpr size_t kSiriWaveformCurveCount         = 3;
-constexpr size_t kSiriWaveformPointCount         = 96;
-constexpr float kSiriWaveformGraphX              = 22.0f;
-constexpr float kSiriWaveformAttFactor           = 4.0f;
-constexpr float kSiriWaveformGain                = 36.0f;
-constexpr float kSiriWaveformIdleAmp             = 0.08f;
-constexpr float kSiriWaveformMaxAmp              = 1.0f;
-constexpr float kSiriWaveformInputFloor          = 0.04f;
-constexpr float kSiriWaveformInputPower          = 0.65f;
-constexpr float kSiriWaveformResponse            = 0.18f;
-constexpr float kSiriWaveformWidthScale          = 2.0f;
-constexpr float kSiriTwoPi                       = 6.2831853f;
-constexpr float kSiriPhaseSpeedScale             = 8.0f;
-constexpr float kSiriCurveFadeSpeed              = 3.0f;
-constexpr int32_t kSiriCanvasScale               = 1;
-constexpr int32_t kSiriRenderWidth               = kWaveformPanelWidth / kSiriCanvasScale;
-constexpr int32_t kSiriRenderHeight              = kWaveformPanelHeight / kSiriCanvasScale;
-constexpr uint8_t kSiriCanvasAlpha               = 255;
-constexpr int32_t kSiriEdgeFadeWidth             = 12;
-constexpr uint32_t kSiriCurveMinLifetimeMs       = 500;
-constexpr uint32_t kSiriCurveMaxLifetimeMs       = 1000;
+constexpr size_t kPrismWaveformLayerCount        = 3;
+constexpr size_t kPrismWaveformCurveCount        = 3;
+constexpr size_t kPrismWaveformPointCount        = 96;
+constexpr float kPrismWaveformGraphX             = 22.0f;
+constexpr float kPrismWaveformAttFactor          = 4.0f;
+constexpr float kPrismWaveformGain               = 36.0f;
+constexpr float kPrismWaveformIdleAmp            = 0.08f;
+constexpr float kPrismWaveformMaxAmp             = 1.0f;
+constexpr float kPrismWaveformInputFloor         = 0.04f;
+constexpr float kPrismWaveformInputPower         = 0.65f;
+constexpr float kPrismWaveformResponse           = 0.18f;
+constexpr float kPrismWaveformWidthScale         = 2.0f;
+constexpr float kPrismTwoPi                      = 6.2831853f;
+constexpr float kPrismPhaseSpeedScale            = 8.0f;
+constexpr float kPrismCurveFadeSpeed             = 3.0f;
+constexpr int32_t kPrismCanvasScale              = 1;
+constexpr int32_t kPrismRenderWidth              = kWaveformPanelWidth / kPrismCanvasScale;
+constexpr int32_t kPrismRenderHeight             = kWaveformPanelHeight / kPrismCanvasScale;
+constexpr uint8_t kPrismCanvasAlpha              = 255;
+constexpr int32_t kPrismEdgeFadeWidth            = 12;
+constexpr uint32_t kPrismCurveMinLifetimeMs      = 500;
+constexpr uint32_t kPrismCurveMaxLifetimeMs      = 1000;
 constexpr int32_t kDurationPanelWidth            = 70;
 constexpr int32_t kDurationPanelHeight           = 18;
 constexpr int32_t kDurationPanelX                = 0;
@@ -352,9 +352,9 @@ private:
     }
 };
 
-class SiriWaveformView : public RecordingWaveformViewBase {
+class PrismWaveformView : public RecordingWaveformViewBase {
 public:
-    explicit SiriWaveformView(lv_obj_t* parent)
+    explicit PrismWaveformView(lv_obj_t* parent)
         : RecordingWaveformViewBase(parent),
           _canvas(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Canvas>(_panel->raw_ptr()))
     {
@@ -381,7 +381,7 @@ public:
             }
             amp = std::max(amp, sample_sum / static_cast<float>(frame.samples.size()));
         }
-        _target_amp = std::clamp(amp * kSiriWaveformGain, 0.0f, 1.0f);
+        _target_amp = std::clamp(amp * kPrismWaveformGain, 0.0f, 1.0f);
     }
 
     void tick(uint32_t nowMs) override
@@ -392,16 +392,16 @@ public:
         }
         _last_tick_ms = nowMs;
 
-        _display_amp += (_target_amp - _display_amp) * kSiriWaveformResponse;
+        _display_amp += (_target_amp - _display_amp) * kPrismWaveformResponse;
         _target_amp *= std::pow(0.03f, dt * 4.0f);
 
         const float phase_dt = dt == 0.0f ? 0.016f : dt;
         updatePattern(nowMs, phase_dt);
         for (auto& layer : _layers) {
             for (auto& curve : layer.curves) {
-                curve.phase += curve.speed * phase_dt * kSiriPhaseSpeedScale;
-                if (curve.phase > kSiriTwoPi) {
-                    curve.phase -= kSiriTwoPi;
+                curve.phase += curve.speed * phase_dt * kPrismPhaseSpeedScale;
+                if (curve.phase > kPrismTwoPi) {
+                    curve.phase -= kPrismTwoPi;
                 }
             }
         }
@@ -429,7 +429,7 @@ private:
         uint8_t r;
         uint8_t g;
         uint8_t b;
-        std::array<RuntimeCurve, kSiriWaveformCurveCount> curves;
+        std::array<RuntimeCurve, kPrismWaveformCurveCount> curves;
     };
 
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Canvas> _canvas;
@@ -438,7 +438,7 @@ private:
     float _display_amp     = 0.0f;
     uint32_t _last_tick_ms = 0;
     uint32_t _random_state = 0xA53C9E2Du;
-    std::array<Layer, kSiriWaveformLayerCount> _layers{{
+    std::array<Layer, kPrismWaveformLayerCount> _layers{{
         {
             15,
             82,
@@ -473,7 +473,7 @@ private:
 
     static float globalAtt(float x)
     {
-        return std::pow(kSiriWaveformAttFactor / (kSiriWaveformAttFactor + x * x), kSiriWaveformAttFactor);
+        return std::pow(kPrismWaveformAttFactor / (kPrismWaveformAttFactor + x * x), kPrismWaveformAttFactor);
     }
 
     float layerHeight(const Layer& layer, float graph_x) const
@@ -483,16 +483,16 @@ private:
             const auto& curve = layer.curves[i];
             const float spread =
                 4.0f * (-1.0f + static_cast<float>(i) * 2.0f / static_cast<float>(layer.curves.size() - 1));
-            const float x = graph_x / (curve.width * kSiriWaveformWidthScale) - (spread + curve.offset);
+            const float x = graph_x / (curve.width * kPrismWaveformWidthScale) - (spread + curve.offset);
             y += std::abs(curve.amp * std::sin(curve.verse * x - curve.phase) * globalAtt(x));
         }
 
         const float relative = y / static_cast<float>(layer.curves.size());
         const float input_amp =
-            std::clamp((_display_amp - kSiriWaveformInputFloor) / (1.0f - kSiriWaveformInputFloor), 0.0f, 1.0f);
-        const float dynamic_amp = std::pow(input_amp, kSiriWaveformInputPower) * kSiriWaveformMaxAmp;
-        const float amp         = std::clamp(kSiriWaveformIdleAmp + dynamic_amp, 0.0f, 1.0f);
-        return relative * globalAtt((graph_x / kSiriWaveformGraphX) * 2.0f) * amp;
+            std::clamp((_display_amp - kPrismWaveformInputFloor) / (1.0f - kPrismWaveformInputFloor), 0.0f, 1.0f);
+        const float dynamic_amp = std::pow(input_amp, kPrismWaveformInputPower) * kPrismWaveformMaxAmp;
+        const float amp         = std::clamp(kPrismWaveformIdleAmp + dynamic_amp, 0.0f, 1.0f);
+        return relative * globalAtt((graph_x / kPrismWaveformGraphX) * 2.0f) * amp;
     }
 
     uint32_t* canvasPixels()
@@ -502,7 +502,7 @@ private:
 
     static uint32_t packArgb(uint8_t r, uint8_t g, uint8_t b)
     {
-        return (static_cast<uint32_t>(kSiriCanvasAlpha) << 24) | (static_cast<uint32_t>(r) << 16) |
+        return (static_cast<uint32_t>(kPrismCanvasAlpha) << 24) | (static_cast<uint32_t>(r) << 16) |
                (static_cast<uint32_t>(g) << 8) | b;
     }
 
@@ -540,8 +540,8 @@ private:
 
     uint32_t randomLifetimeMs()
     {
-        return static_cast<uint32_t>(std::round(randomRange(_random_state, static_cast<float>(kSiriCurveMinLifetimeMs),
-                                                            static_cast<float>(kSiriCurveMaxLifetimeMs))));
+        return static_cast<uint32_t>(std::round(randomRange(_random_state, static_cast<float>(kPrismCurveMinLifetimeMs),
+                                                            static_cast<float>(kPrismCurveMaxLifetimeMs))));
     }
 
     void spawnLayer(Layer& layer, uint32_t nowMs)
@@ -554,7 +554,7 @@ private:
             curve.speed      = randomRange(_random_state, 0.5f, 1.0f);
             curve.width      = randomRange(_random_state, 1.0f, 3.0f);
             curve.verse      = randomRange(_random_state, 0.0f, 1.0f) < 0.15f ? -layer_verse : layer_verse;
-            curve.phase      = randomRange(_random_state, 0.0f, kSiriTwoPi);
+            curve.phase      = randomRange(_random_state, 0.0f, kPrismTwoPi);
             curve.despawn_ms = nowMs + randomLifetimeMs();
         }
     }
@@ -570,7 +570,7 @@ private:
 
     void updatePattern(uint32_t nowMs, float dt)
     {
-        const float delta = kSiriCurveFadeSpeed * dt;
+        const float delta = kPrismCurveFadeSpeed * dt;
         for (auto& layer : _layers) {
             bool all_dead = true;
             for (auto& curve : layer.curves) {
@@ -608,23 +608,23 @@ private:
     {
         static constexpr float kLayerAlpha = 0.78f;
 
-        std::array<std::array<float, kSiriRenderWidth>, kSiriWaveformLayerCount> heights{};
-        const float render_center_y = static_cast<float>(kSiriRenderHeight) * 0.5f;
-        const float y_scale         = static_cast<float>(kSiriRenderHeight) * 1.8f;
+        std::array<std::array<float, kPrismRenderWidth>, kPrismWaveformLayerCount> heights{};
+        const float render_center_y = static_cast<float>(kPrismRenderHeight) * 0.5f;
+        const float y_scale         = static_cast<float>(kPrismRenderHeight) * 1.8f;
 
         for (size_t layer_index = 0; layer_index < _layers.size(); ++layer_index) {
-            for (int32_t x = 0; x < kSiriRenderWidth; ++x) {
-                const float ratio       = static_cast<float>(x) / static_cast<float>(kSiriRenderWidth - 1);
-                const float graph_x     = ratio * kSiriWaveformGraphX * 2.0f - kSiriWaveformGraphX;
+            for (int32_t x = 0; x < kPrismRenderWidth; ++x) {
+                const float ratio       = static_cast<float>(x) / static_cast<float>(kPrismRenderWidth - 1);
+                const float graph_x     = ratio * kPrismWaveformGraphX * 2.0f - kPrismWaveformGraphX;
                 heights[layer_index][x] = layerHeight(_layers[layer_index], graph_x) * y_scale;
             }
         }
 
         uint32_t* pixels = canvasPixels();
-        for (int32_t y = 0; y < kSiriRenderHeight; ++y) {
+        for (int32_t y = 0; y < kPrismRenderHeight; ++y) {
             const float dist = std::abs(static_cast<float>(y) - render_center_y);
-            for (int32_t x = 0; x < kSiriRenderWidth; ++x) {
-                const float edge_fade = horizontalEdgeFade(x, kSiriRenderWidth, kSiriEdgeFadeWidth);
+            for (int32_t x = 0; x < kPrismRenderWidth; ++x) {
+                const float edge_fade = horizontalEdgeFade(x, kPrismRenderWidth, kPrismEdgeFadeWidth);
                 uint32_t r            = 0;
                 uint32_t g            = 0;
                 uint32_t b            = 0;
@@ -642,7 +642,7 @@ private:
                     b                 = std::min<uint32_t>(255, b + static_cast<uint32_t>(layer.b * alpha));
                 }
 
-                if (y == kSiriRenderHeight / 2) {
+                if (y == kPrismRenderHeight / 2) {
                     const uint32_t line = static_cast<uint32_t>(std::round(255.0f * edge_fade));
                     r                   = std::max<uint32_t>(r, line);
                     g                   = std::max<uint32_t>(g, line);
@@ -660,11 +660,11 @@ private:
 
     void writeScaledPixel(uint32_t* pixels, int32_t x, int32_t y, uint32_t color)
     {
-        const int32_t out_x = x * kSiriCanvasScale;
-        const int32_t out_y = y * kSiriCanvasScale;
-        for (int32_t dy = 0; dy < kSiriCanvasScale; ++dy) {
+        const int32_t out_x = x * kPrismCanvasScale;
+        const int32_t out_y = y * kPrismCanvasScale;
+        for (int32_t dy = 0; dy < kPrismCanvasScale; ++dy) {
             uint32_t* row = pixels + (out_y + dy) * kWaveformPanelWidth + out_x;
-            for (int32_t dx = 0; dx < kSiriCanvasScale; ++dx) {
+            for (int32_t dx = 0; dx < kPrismCanvasScale; ++dx) {
                 row[dx] = color;
             }
         }
@@ -864,8 +864,8 @@ void RecordingView::createWaveform(RecordingWaveformType type)
         case RecordingWaveformType::Line:
             _waveform = std::make_unique<LineWaveformView>(_root->raw_ptr());
             break;
-        case RecordingWaveformType::Siri:
-            _waveform = std::make_unique<SiriWaveformView>(_root->raw_ptr());
+        case RecordingWaveformType::Prism:
+            _waveform = std::make_unique<PrismWaveformView>(_root->raw_ptr());
             break;
     }
 
