@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <lvgl.h>
-#include <smooth_lvgl.hpp>
 #include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[])

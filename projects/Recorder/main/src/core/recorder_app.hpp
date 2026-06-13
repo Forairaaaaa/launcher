@@ -6,6 +6,8 @@
 #include "view_models/files_view_model.hpp"
 #include "view_models/playback_view_model.hpp"
 #include "view_models/recording_view_model.hpp"
+#include "views/recording_view.hpp"
+#include "views/view.hpp"
 #include <lvgl.h>
 #include <array>
 
@@ -36,12 +38,16 @@ private:
     RecordingViewModel _recording_vm;
     FilesViewModel _files_vm;
     PlaybackViewModel _playback_vm;
+    RecordingView _recording_view;
     ViewModel* _current_vm    = nullptr;
+    View* _current_view       = nullptr;
     size_t _route_observer_id = 0;
 
     std::array<ViewModel*, 3> _view_models;
+    std::array<View*, 3> _views;
 
     ViewModel* viewModelFor(PageId page);
+    View* viewFor(PageId page);
     void setCurrentPage(PageId page);
     static void onRouteChanged(void* context, const PageId& page);
     static void onKeyboardEvent(lv_event_t* event);

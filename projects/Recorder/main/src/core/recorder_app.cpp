@@ -26,7 +26,9 @@ RecorderApp::RecorderApp()
     : _recording_vm(_router, _recording_model),
       _files_vm(_router, _files_model, _playback_model),
       _playback_vm(_router, _playback_model),
-      _view_models{&_recording_vm, &_files_vm, &_playback_vm}
+      _recording_view(_recording_vm),
+      _view_models{&_recording_vm, &_files_vm, &_playback_vm},
+      _views{&_recording_view, nullptr, nullptr}
 {
 }
 
@@ -39,6 +41,8 @@ RecorderApp::~RecorderApp()
 
 void RecorderApp::start()
 {
+    lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x000000), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(lv_screen_active(), LV_OPA_COVER, LV_PART_MAIN);
     _route_observer_id = _router.currentPage().observe(this, onRouteChanged);
     lv_obj_add_event_cb(lv_screen_active(), onKeyboardEvent, keyboardEventCode(), this);
     setCurrentPage(_router.page());
@@ -68,19 +72,36 @@ ViewModel* RecorderApp::viewModelFor(PageId page)
     return nullptr;
 }
 
+View* RecorderApp::viewFor(PageId page)
+{
+    const auto index = static_cast<size_t>(page);
+    if (index >= _views.size()) {
+        return nullptr;
+    }
+    return _views[index];
+}
+
 void RecorderApp::setCurrentPage(PageId page)
 {
     ViewModel* next = viewModelFor(page);
-    if (!next || next == _current_vm) {
+    View* next_view = viewFor(page);
+    if (!next || (next == _current_vm && next_view == _current_view)) {
         return;
     }
 
+    if (_current_view) {
+        _current_view->onExit();
+    }
     if (_current_vm) {
         _current_vm->onExit();
     }
-    _current_vm = next;
+    _current_vm   = next;
+    _current_view = next_view;
     spdlog::info("Recorder route -> {}", pageIdName(page));
     _current_vm->onEnter();
+    if (_current_view) {
+        _current_view->onEnter(lv_screen_active());
+    }
 }
 
 void RecorderApp::onRouteChanged(void* context, const PageId& page)
