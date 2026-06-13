@@ -60,6 +60,9 @@ void RecorderApp::tick(uint32_t nowMs)
     if (_current_vm) {
         _current_vm->tick(nowMs);
     }
+    if (_current_view) {
+        _current_view->tick(nowMs);
+    }
 }
 
 ViewModel* RecorderApp::viewModelFor(PageId page)

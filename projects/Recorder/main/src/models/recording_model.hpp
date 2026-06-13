@@ -26,6 +26,11 @@ public:
         return _frame;
     }
 
+    smooth_ui_toolkit::Observable<uint32_t>& elapsedSec()
+    {
+        return _elapsed_sec;
+    }
+
     void start();
     void stop();
     void pause();
@@ -38,6 +43,7 @@ private:
     smooth_ui_toolkit::Observable<RecordingState> _state{RecordingState::Idle};
     smooth_ui_toolkit::Observable<float> _mic_amp{0.0f};
     smooth_ui_toolkit::Observable<AudioFrame> _frame{AudioFrame{}};
+    smooth_ui_toolkit::Observable<uint32_t> _elapsed_sec{0};
     std::unique_ptr<Impl> _impl;
 };
 

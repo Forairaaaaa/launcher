@@ -223,6 +223,14 @@ struct RecordingModel::Impl {
         return true;
     }
 
+    uint32_t elapsedSec() const
+    {
+        if (kCaptureSampleRate == 0) {
+            return 0;
+        }
+        return static_cast<uint32_t>(captured_frames.load() / kCaptureSampleRate);
+    }
+
     void cleanup()
     {
         if (device_inited) {
@@ -376,11 +384,13 @@ void RecordingModel::start()
 
     spdlog::info("RecordingModel: start requested");
     if (_impl->start()) {
+        _elapsed_sec.set(0);
         _state.set(RecordingState::Recording);
     } else {
         _state.set(RecordingState::Idle);
         _mic_amp.set(0.0f);
         _frame.set(AudioFrame{});
+        _elapsed_sec.set(0);
     }
 }
 
@@ -399,6 +409,7 @@ void RecordingModel::stop()
     _state.set(RecordingState::Idle);
     _mic_amp.set(0.0f);
     _frame.set(AudioFrame{});
+    _elapsed_sec.set(0);
 }
 
 void RecordingModel::pause()
@@ -427,6 +438,11 @@ void RecordingModel::tick(uint32_t nowMs)
 
     if (_state.get() != RecordingState::Recording) {
         return;
+    }
+
+    const uint32_t elapsed_sec = _impl->elapsedSec();
+    if (_elapsed_sec.get() != elapsed_sec) {
+        _elapsed_sec.set(elapsed_sec);
     }
 
     AudioFrame next;

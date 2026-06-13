@@ -33,6 +33,11 @@ public:
         return _model.frame();
     }
 
+    smooth_ui_toolkit::Observable<uint32_t>& elapsedSec()
+    {
+        return _model.elapsedSec();
+    }
+
 private:
     RecordingModel& _model;
 };
