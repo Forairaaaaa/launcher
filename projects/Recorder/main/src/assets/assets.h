@@ -15,9 +15,13 @@ extern "C" {
 #endif
 
 /* Images */
+LV_IMAGE_DECLARE(image_icon_basic_wave);
+LV_IMAGE_DECLARE(image_icon_line_wave);
 LV_IMAGE_DECLARE(image_icon_list);
 LV_IMAGE_DECLARE(image_icon_pause);
+LV_IMAGE_DECLARE(image_icon_prism_wave);
 LV_IMAGE_DECLARE(image_icon_record);
+LV_IMAGE_DECLARE(image_icon_spectrum_wave);
 LV_IMAGE_DECLARE(image_icon_stop);
 LV_IMAGE_DECLARE(image_key_indicators);
 

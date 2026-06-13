@@ -9,12 +9,12 @@ RecordingWaveformType nextWaveformType(RecordingWaveformType type)
 {
     switch (type) {
         case RecordingWaveformType::Basic:
-            return RecordingWaveformType::Line;
-        case RecordingWaveformType::Line:
             return RecordingWaveformType::Prism;
         case RecordingWaveformType::Prism:
             return RecordingWaveformType::Spectrum;
         case RecordingWaveformType::Spectrum:
+            return RecordingWaveformType::Line;
+        case RecordingWaveformType::Line:
             return RecordingWaveformType::Basic;
     }
     return RecordingWaveformType::Basic;

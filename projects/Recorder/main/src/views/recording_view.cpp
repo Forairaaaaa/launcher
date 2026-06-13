@@ -966,6 +966,25 @@ private:
     }
 };
 
+namespace {
+
+const void* waveformIcon(RecordingWaveformType type)
+{
+    switch (type) {
+        case RecordingWaveformType::Basic:
+            return &image_icon_basic_wave;
+        case RecordingWaveformType::Prism:
+            return &image_icon_prism_wave;
+        case RecordingWaveformType::Spectrum:
+            return &image_icon_spectrum_wave;
+        case RecordingWaveformType::Line:
+            return &image_icon_line_wave;
+    }
+    return nullptr;
+}
+
+}  // namespace
+
 RecordingView::RecordingView(RecordingViewModel& view_model) : _view_model(view_model)
 {
 }
@@ -1087,6 +1106,7 @@ void RecordingView::renderState(RecordingState state)
                 _paused_label->setVisible(false);
             }
             _key_bar->setItems({
+                {'4', waveformIcon(_view_model.waveformType().get())},
                 {'6', &image_icon_record},
                 {'8', &image_icon_list},
             });
@@ -1099,6 +1119,7 @@ void RecordingView::renderState(RecordingState state)
                 _paused_label->setVisible(false);
             }
             _key_bar->setItems({
+                {'4', waveformIcon(_view_model.waveformType().get())},
                 {'5', &image_icon_pause},
                 {'6', &image_icon_stop},
                 {'8', &image_icon_list},
@@ -1112,6 +1133,7 @@ void RecordingView::renderState(RecordingState state)
                 _paused_label->setVisible(true);
             }
             _key_bar->setItems({
+                {'4', waveformIcon(_view_model.waveformType().get())},
                 {'5', &image_icon_record},
                 {'6', &image_icon_stop},
                 {'8', &image_icon_list},
@@ -1137,6 +1159,7 @@ void RecordingView::renderFrame(const AudioFrame& frame)
 void RecordingView::renderWaveformType(RecordingWaveformType type)
 {
     createWaveform(type);
+    renderState(_view_model.state().get());
 }
 
 void RecordingView::onStateChanged(void* context, const RecordingState& state)
