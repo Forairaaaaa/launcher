@@ -27,7 +27,7 @@ constexpr ma_uint32 kCaptureChannels   = 1;
 constexpr ma_uint32 kCaptureSampleRate = 48000;
 constexpr ma_format kCaptureFormat     = ma_format_f32;
 constexpr size_t kPreviewSampleCount   = 24;
-constexpr auto kStartCooldown          = std::chrono::milliseconds(800);
+constexpr auto kStartCooldown          = std::chrono::milliseconds(300);
 constexpr auto kMonitorRetryInterval   = std::chrono::milliseconds(2000);
 
 std::string makeRecordingPath()

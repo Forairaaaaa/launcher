@@ -52,9 +52,9 @@ public:
     virtual void tick(uint32_t nowMs)              = 0;
 };
 
-class IosWaveformView : public RecordingWaveformViewBase {
+class BasicWaveformView : public RecordingWaveformViewBase {
 public:
-    explicit IosWaveformView(lv_obj_t* parent)
+    explicit BasicWaveformView(lv_obj_t* parent)
         : _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent))
     {
         _color.duration       = kWaveformColorDuration;
@@ -197,7 +197,7 @@ private:
 
     static void onDraw(lv_event_t* event)
     {
-        auto* self = static_cast<IosWaveformView*>(lv_event_get_user_data(event));
+        auto* self = static_cast<BasicWaveformView*>(lv_event_get_user_data(event));
         if (self) {
             self->draw(event);
         }
@@ -397,7 +397,7 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _root->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
-    _waveform       = std::make_unique<IosWaveformView>(_root->raw_ptr());
+    _waveform       = std::make_unique<BasicWaveformView>(_root->raw_ptr());
     _duration_panel = std::make_unique<DurationPanel>(_root->raw_ptr());
     _paused_label   = std::make_unique<PausedLabel>(_root->raw_ptr());
 
