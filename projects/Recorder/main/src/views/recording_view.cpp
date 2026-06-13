@@ -228,7 +228,7 @@ public:
             }
             amp = std::max(amp, sample_sum / static_cast<float>(frame.samples.size()));
         }
-        _target_amp = std::max(_target_amp, std::clamp(amp, 0.0f, 1.0f));
+        _amp = std::clamp(amp, 0.0f, 1.0f);
     }
 
     void tick(uint32_t nowMs) override
@@ -237,14 +237,12 @@ public:
             return;
         }
 
-        updateAmp(nowMs);
-
         if (_last_sample_ms == 0) {
             _last_sample_ms = nowMs;
         }
 
         while (nowMs - _last_sample_ms >= kWaveformSampleIntervalMs) {
-            _bars.push(toVisualAmp(_display_amp));
+            _bars.push(toVisualAmp(_amp));
             _last_sample_ms += kWaveformSampleIntervalMs;
         }
 
@@ -253,29 +251,8 @@ public:
 
 private:
     smooth_ui_toolkit::RingBuffer<float, kWaveformBarCount> _bars;
-    float _target_amp        = 0.0f;
-    float _display_amp       = 0.0f;
-    uint32_t _last_tick_ms   = 0;
+    float _amp               = 0.0f;
     uint32_t _last_sample_ms = 0;
-
-    void updateAmp(uint32_t nowMs)
-    {
-        float dt = 0.0f;
-        if (_last_tick_ms != 0 && nowMs >= _last_tick_ms) {
-            dt = static_cast<float>(nowMs - _last_tick_ms) / 1000.0f;
-        }
-        _last_tick_ms = nowMs;
-
-        const float response = _target_amp >= _display_amp ? 0.42f : 0.32f;
-        _display_amp += (_target_amp - _display_amp) * response;
-        _target_amp *= std::pow(0.03f, dt * 6.0f);
-        if (_target_amp < 0.0005f) {
-            _target_amp = 0.0f;
-        }
-        if (_display_amp < 0.0005f) {
-            _display_amp = 0.0f;
-        }
-    }
 
     static float toVisualAmp(float amp)
     {
