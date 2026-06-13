@@ -28,6 +28,7 @@ enum class PlaybackState {
 struct AudioFrame {
     float amp = 0.0f;
     std::vector<float> samples;
+    std::vector<float> spectrum;
 };
 
 struct RecordingFile {

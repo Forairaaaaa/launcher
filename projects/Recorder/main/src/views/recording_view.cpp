@@ -35,10 +35,19 @@ constexpr size_t kLineWaveformPointCount         = 128;
 constexpr float kLineWaveformGain                = 8.0f;
 constexpr uint32_t kBasicWaveformFrameIntervalMs = 33;
 constexpr uint32_t kLineWaveformFrameIntervalMs  = 33;
+constexpr uint32_t kSpectrumFrameIntervalMs      = 33;
 constexpr uint32_t kWaveformHistoryMs            = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs     = kWaveformHistoryMs / kWaveformBarCount;
 constexpr uint32_t kLineWaveformSampleIntervalMs = kWaveformHistoryMs / kLineWaveformPointCount;
 constexpr float kWaveformGain                    = 8.0f;
+constexpr size_t kSpectrumBarCount               = 24;
+constexpr int32_t kSpectrumBarWidth              = 5;
+constexpr int32_t kSpectrumBarPitch              = 10;
+constexpr int32_t kSpectrumBarRadius             = 2;
+constexpr int32_t kSpectrumMinBarHeight          = 2;
+constexpr int32_t kSpectrumMaxBarHeight          = 76;
+constexpr float kSpectrumRiseResponse            = 0.55f;
+constexpr float kSpectrumFallResponse            = 0.20f;
 constexpr size_t kPrismWaveformLayerCount        = 3;
 constexpr size_t kPrismWaveformCurveCount        = 3;
 constexpr size_t kPrismWaveformPointCount        = 96;
@@ -375,6 +384,88 @@ private:
     static void onDraw(lv_event_t* event)
     {
         auto* self = static_cast<LineWaveformView*>(lv_event_get_user_data(event));
+        if (self) {
+            self->draw(event);
+        }
+    }
+};
+
+class SpectrumWaveformView : public RecordingWaveformViewBase {
+public:
+    explicit SpectrumWaveformView(lv_obj_t* parent) : RecordingWaveformViewBase(parent)
+    {
+        _panel->addEventCb(onDraw, LV_EVENT_DRAW_MAIN, this);
+    }
+
+    void setFrame(const AudioFrame& frame) override
+    {
+        _target_bars.fill(0.0f);
+        const size_t count = std::min(_target_bars.size(), frame.spectrum.size());
+        for (size_t i = 0; i < count; ++i) {
+            _target_bars[i] = std::clamp(frame.spectrum[i], 0.0f, 1.0f);
+        }
+    }
+
+    void tick(uint32_t nowMs) override
+    {
+        if (!shouldRender(nowMs, kSpectrumFrameIntervalMs)) {
+            return;
+        }
+
+        for (size_t i = 0; i < _bars.size(); ++i) {
+            const float response = _target_bars[i] > _bars[i] ? kSpectrumRiseResponse : kSpectrumFallResponse;
+            _bars[i] += (_target_bars[i] - _bars[i]) * response;
+        }
+
+        RecordingWaveformViewBase::tick(nowMs);
+    }
+
+private:
+    std::array<float, kSpectrumBarCount> _bars{};
+    std::array<float, kSpectrumBarCount> _target_bars{};
+
+    void draw(lv_event_t* event)
+    {
+        lv_layer_t* layer = lv_event_get_layer(event);
+        if (!layer) {
+            return;
+        }
+
+        lv_area_t coords;
+        lv_obj_get_coords(_panel->raw_ptr(), &coords);
+
+        lv_draw_rect_dsc_t rect_dsc;
+        lv_draw_rect_dsc_init(&rect_dsc);
+        rect_dsc.bg_color     = currentColor();
+        rect_dsc.bg_opa       = LV_OPA_COVER;
+        rect_dsc.border_width = 0;
+        rect_dsc.radius       = kSpectrumBarRadius;
+
+        const int32_t total_width =
+            static_cast<int32_t>((kSpectrumBarCount - 1) * kSpectrumBarPitch + kSpectrumBarWidth);
+        const int32_t start_x  = coords.x1 + (kWaveformPanelWidth - total_width) / 2;
+        const int32_t bottom_y = coords.y1 + kWaveformPanelHeight - 2;
+
+        for (size_t i = 0; i < _bars.size(); ++i) {
+            const float value = std::clamp(_bars[i], 0.0f, 1.0f);
+            int32_t height = kSpectrumMinBarHeight +
+                             static_cast<int32_t>(std::round(value * (kSpectrumMaxBarHeight - kSpectrumMinBarHeight)));
+            height         = std::clamp(height, kSpectrumMinBarHeight, kSpectrumMaxBarHeight);
+
+            lv_area_t bar_area{};
+            bar_area.x1 = start_x + static_cast<int32_t>(i) * kSpectrumBarPitch;
+            bar_area.x2 = bar_area.x1 + kSpectrumBarWidth - 1;
+            bar_area.y1 = bottom_y - height + 1;
+            bar_area.y2 = bottom_y;
+
+            rect_dsc.bg_opa = edgeOpacity(i, _bars.size());
+            lv_draw_rect(layer, &rect_dsc, &bar_area);
+        }
+    }
+
+    static void onDraw(lv_event_t* event)
+    {
+        auto* self = static_cast<SpectrumWaveformView*>(lv_event_get_user_data(event));
         if (self) {
             self->draw(event);
         }
@@ -899,6 +990,9 @@ void RecordingView::createWaveform(RecordingWaveformType type)
             break;
         case RecordingWaveformType::Prism:
             _waveform = std::make_unique<PrismWaveformView>(_root->raw_ptr());
+            break;
+        case RecordingWaveformType::Spectrum:
+            _waveform = std::make_unique<SpectrumWaveformView>(_root->raw_ptr());
             break;
     }
 

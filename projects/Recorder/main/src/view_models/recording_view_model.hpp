@@ -9,6 +9,7 @@ enum class RecordingWaveformType {
     Basic,
     Line,
     Prism,
+    Spectrum,
 };
 
 class RecordingViewModel : public ViewModel {

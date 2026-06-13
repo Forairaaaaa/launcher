@@ -13,6 +13,8 @@ RecordingWaveformType nextWaveformType(RecordingWaveformType type)
         case RecordingWaveformType::Line:
             return RecordingWaveformType::Prism;
         case RecordingWaveformType::Prism:
+            return RecordingWaveformType::Spectrum;
+        case RecordingWaveformType::Spectrum:
             return RecordingWaveformType::Basic;
     }
     return RecordingWaveformType::Basic;
@@ -27,6 +29,8 @@ const char* waveformTypeName(RecordingWaveformType type)
             return "Line";
         case RecordingWaveformType::Prism:
             return "Prism";
+        case RecordingWaveformType::Spectrum:
+            return "Spectrum";
     }
     return "Unknown";
 }

@@ -27,6 +27,11 @@ constexpr ma_uint32 kCaptureChannels   = 1;
 constexpr ma_uint32 kCaptureSampleRate = 48000;
 constexpr ma_format kCaptureFormat     = ma_format_f32;
 constexpr size_t kPreviewSampleCount   = 24;
+constexpr size_t kSpectrumBinCount     = 24;
+constexpr float kSpectrumMinHz         = 80.0f;
+constexpr float kSpectrumMaxHz         = 6000.0f;
+constexpr float kSpectrumGain          = 55.0f;
+constexpr float kPi                    = 3.14159265358979323846f;
 constexpr auto kStartCooldown          = std::chrono::milliseconds(300);
 constexpr auto kMonitorRetryInterval   = std::chrono::milliseconds(2000);
 
@@ -75,6 +80,52 @@ const char* maResultName(ma_result result)
             return "MA_FAILED_TO_OPEN_BACKEND_DEVICE";
         default:
             return "MA_ERROR";
+    }
+}
+
+float spectrumFrequency(size_t index)
+{
+    if (kSpectrumBinCount <= 1) {
+        return kSpectrumMinHz;
+    }
+
+    const float ratio = static_cast<float>(index) / static_cast<float>(kSpectrumBinCount - 1);
+    return kSpectrumMinHz * std::pow(kSpectrumMaxHz / kSpectrumMinHz, ratio);
+}
+
+float goertzelMagnitude(const float* samples, ma_uint32 frame_count, float frequency)
+{
+    if (!samples || frame_count == 0 || frequency <= 0.0f) {
+        return 0.0f;
+    }
+
+    const float omega = 2.0f * kPi * frequency / static_cast<float>(kCaptureSampleRate);
+    const float coeff = 2.0f * std::cos(omega);
+    float q0          = 0.0f;
+    float q1          = 0.0f;
+    float q2          = 0.0f;
+
+    for (ma_uint32 i = 0; i < frame_count; ++i) {
+        q0 = coeff * q1 - q2 + samples[i];
+        q2 = q1;
+        q1 = q0;
+    }
+
+    const float power = q1 * q1 + q2 * q2 - coeff * q1 * q2;
+    return std::sqrt(std::max(power, 0.0f)) / static_cast<float>(frame_count);
+}
+
+void fillSpectrum(AudioFrame& frame, const float* samples, ma_uint32 frame_count)
+{
+    frame.spectrum.assign(kSpectrumBinCount, 0.0f);
+    if (!samples || frame_count == 0) {
+        return;
+    }
+
+    for (size_t i = 0; i < frame.spectrum.size(); ++i) {
+        const float frequency = spectrumFrequency(i);
+        const float magnitude = goertzelMagnitude(samples, frame_count, frequency);
+        frame.spectrum[i]     = std::clamp(std::pow(magnitude * kSpectrumGain, 0.55f), 0.0f, 1.0f);
     }
 }
 
@@ -214,6 +265,7 @@ struct RecordingModel::Impl {
             std::lock_guard<std::mutex> lock(frame_mutex);
             latest_frame = AudioFrame{};
             latest_frame.samples.assign(kPreviewSampleCount, 0.5f);
+            latest_frame.spectrum.assign(kSpectrumBinCount, 0.0f);
             has_new_frame = true;
         }
 
@@ -429,6 +481,7 @@ struct RecordingModel::Impl {
         }
 
         frame.amp = std::clamp(sum_abs / static_cast<float>(frame_count), 0.0f, 1.0f);
+        fillSpectrum(frame, samples, frame_count);
 
         {
             std::lock_guard<std::mutex> lock(self->frame_mutex);
