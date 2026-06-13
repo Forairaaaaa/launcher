@@ -53,12 +53,17 @@ RecorderApp::~RecorderApp()
     if (_route_observer_id != 0) {
         _router.currentPage().removeObserver(_route_observer_id);
     }
+    if (_input_group) {
+        lv_group_del(_input_group);
+        _input_group = nullptr;
+    }
 }
 
 void RecorderApp::start()
 {
     lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(lv_screen_active(), LV_OPA_COVER, LV_PART_MAIN);
+    setupInputGroup();
     _route_observer_id = _router.currentPage().observe(this, onRouteChanged);
     lv_obj_add_event_cb(lv_screen_active(), onKeyboardEvent, keyboardEventCode(), this);
     setCurrentPage(_router.page());
@@ -98,6 +103,23 @@ View* RecorderApp::viewFor(PageId page)
         return nullptr;
     }
     return _views[index];
+}
+
+void RecorderApp::setupInputGroup()
+{
+    if (_input_group) {
+        return;
+    }
+
+    _input_group = lv_group_create();
+
+    lv_indev_t* indev = lv_indev_get_next(nullptr);
+    while (indev) {
+        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_KEYPAD) {
+            lv_indev_set_group(indev, _input_group);
+        }
+        indev = lv_indev_get_next(indev);
+    }
 }
 
 void RecorderApp::setCurrentPage(PageId page)

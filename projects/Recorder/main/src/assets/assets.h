@@ -27,6 +27,8 @@ LV_IMAGE_DECLARE(image_key_indicators);
 
 /* Fonts */
 LV_FONT_DECLARE(font_chivo_mono_medium_12);
+LV_FONT_DECLARE(font_chivo_medium_12);
+LV_FONT_DECLARE(font_chivo_medium_14);
 
 #ifdef __cplusplus
 }

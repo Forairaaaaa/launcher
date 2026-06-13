@@ -6,6 +6,7 @@
 #include <core/easing/ease.hpp>
 #include <lvgl/lvgl_cpp/canvas.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
+#include <lvgl/lvgl_cpp/text_area.hpp>
 #include <lvgl/number_flow/number_flow.hpp>
 #include <tools/ring_buffer/ring_buffer.hpp>
 #include <algorithm>
@@ -80,6 +81,42 @@ constexpr int32_t kDurationPanelHiddenY          = 64;
 constexpr int32_t kPausedLabelX                  = 0;
 constexpr int32_t kPausedLabelY                  = -75;
 constexpr float kPausedLabelFadeDuration         = 0.3f;
+constexpr int32_t kFileDialogWidth               = 258;
+constexpr int32_t kFileDialogHeight              = 100;
+constexpr int32_t kFileDialogY                   = kWaveformPanelY;
+constexpr int32_t kFileDialogRadius              = 14;
+constexpr int32_t kFilePromptX                   = 17;
+constexpr int32_t kFilePromptY                   = 10;
+constexpr int32_t kFileNameAreaX                 = 11;
+constexpr int32_t kFileNameAreaY                 = 34;
+constexpr int32_t kFileNameAreaWidth             = 238;
+constexpr int32_t kFileNameAreaHeight            = 28;
+constexpr int32_t kFileNameAreaRadius            = 5;
+constexpr int32_t kFileButtonY                   = 67;
+constexpr int32_t kFileButtonWidth               = 87;
+constexpr int32_t kFileButtonHeight              = 23;
+constexpr int32_t kFileButtonRadius              = 5;
+constexpr int32_t kFileDiscardButtonX            = 65;
+constexpr int32_t kFileConfirmButtonX            = 162;
+
+}  // namespace
+
+namespace {
+
+lv_group_t* keyboardGroup()
+{
+    lv_indev_t* indev = lv_indev_get_next(nullptr);
+    while (indev) {
+        if (lv_indev_get_type(indev) == LV_INDEV_TYPE_KEYPAD) {
+            lv_group_t* group = lv_indev_get_group(indev);
+            if (group) {
+                return group;
+            }
+        }
+        indev = lv_indev_get_next(indev);
+    }
+    return nullptr;
+}
 
 }  // namespace
 
@@ -913,6 +950,183 @@ private:
     }
 };
 
+class RecordingView::FileConfirmDialog {
+public:
+    FileConfirmDialog(lv_obj_t* parent, RecordingViewModel& view_model)
+        : _view_model(view_model),
+          _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent)),
+          _prompt_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr())),
+          _input(std::make_unique<smooth_ui_toolkit::lvgl_cpp::TextArea>(_panel->raw_ptr())),
+          _discard_button(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
+          _confirm_button(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr())),
+          _discard_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_discard_button->raw_ptr())),
+          _confirm_label(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_confirm_button->raw_ptr()))
+    {
+        _panel->setSize(kFileDialogWidth, kFileDialogHeight);
+        _panel->align(LV_ALIGN_CENTER, 0, kFileDialogY);
+        _panel->setBgColor(lv_color_hex(0x2D2D2D));
+        _panel->setBgOpa(LV_OPA_COVER);
+        _panel->setRadius(kFileDialogRadius);
+        _panel->setBorderWidth(0);
+        _panel->setShadowWidth(0);
+        _panel->setPaddingAll(0);
+        _panel->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+        _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+
+        setupPrompt();
+        setupInput();
+        setupButton(*_discard_button, *_discard_label, kFileDiscardButtonX, "ESC: Delete", lv_color_hex(0xE3433C),
+                    onDiscardClicked);
+        setupButton(*_confirm_button, *_confirm_label, kFileConfirmButtonX, "Enter: OK", lv_color_hex(0x48C064),
+                    onConfirmClicked);
+    }
+
+    ~FileConfirmDialog()
+    {
+        removeInputFromGroup();
+    }
+
+    void setPending(const PendingRecordingFile& pending)
+    {
+        if (pending.active) {
+            setName(pending.name);
+            _panel->removeFlag(LV_OBJ_FLAG_HIDDEN);
+            lv_obj_move_foreground(_panel->raw_ptr());
+            focusInput();
+        } else {
+            removeInputFromGroup();
+            _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    void setName(const std::string& name)
+    {
+        const char* current = lv_textarea_get_text(_input->raw_ptr());
+        if (current && name == current) {
+            return;
+        }
+
+        _updating_text = true;
+        _input->setText(name);
+        _input->setCursorPos(static_cast<int32_t>(name.size()));
+        _updating_text = false;
+    }
+
+private:
+    RecordingViewModel& _view_model;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _prompt_label;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::TextArea> _input;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _discard_button;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _confirm_button;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _discard_label;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _confirm_label;
+    bool _input_in_group = false;
+    bool _updating_text  = false;
+
+    void setupPrompt()
+    {
+        _prompt_label->setText("Save recording as");
+        _prompt_label->setTextFont(&font_chivo_medium_14);
+        _prompt_label->setTextColor(lv_color_hex(0x888888));
+        _prompt_label->setTextAlign(LV_TEXT_ALIGN_LEFT);
+        _prompt_label->setSize(kFileNameAreaWidth, LV_SIZE_CONTENT);
+        _prompt_label->setPos(kFilePromptX, kFilePromptY);
+    }
+
+    void setupInput()
+    {
+        _input->setPos(kFileNameAreaX, kFileNameAreaY);
+        _input->setSize(kFileNameAreaWidth, kFileNameAreaHeight);
+        _input->setBgColor(lv_color_hex(0x494949));
+        _input->setBgOpa(LV_OPA_COVER);
+        _input->setRadius(kFileNameAreaRadius);
+        _input->setBorderWidth(0);
+        _input->setShadowWidth(0);
+        _input->setPadding(4, 4, 9, 9);
+        _input->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+        _input->setTextFont(&font_chivo_medium_14);
+        _input->setTextColor(lv_color_hex(0xFFFFFF));
+        _input->setOneLine(true);
+        _input->setMaxLength(64);
+        _input->addEventCb(onInputValueChanged, LV_EVENT_VALUE_CHANGED, this);
+    }
+
+    void setupButton(smooth_ui_toolkit::lvgl_cpp::Container& button, smooth_ui_toolkit::lvgl_cpp::Label& label,
+                     int32_t x, const char* text, lv_color_t color, lv_event_cb_t callback)
+    {
+        button.setPos(x, kFileButtonY);
+        button.setSize(kFileButtonWidth, kFileButtonHeight);
+        button.setBgColor(color);
+        button.setBgOpa(LV_OPA_COVER);
+        button.setRadius(kFileButtonRadius);
+        button.setBorderWidth(0);
+        button.setShadowWidth(0);
+        button.setPaddingAll(0);
+        button.removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        button.addFlag(LV_OBJ_FLAG_CLICKABLE);
+        button.addEventCb(callback, LV_EVENT_CLICKED, this);
+
+        label.setText(text);
+        label.setTextFont(&font_chivo_medium_14);
+        label.setTextColor(lv_color_hex(0xFFFFFF));
+        label.setTextAlign(LV_TEXT_ALIGN_CENTER);
+        label.center();
+    }
+
+    void focusInput()
+    {
+        lv_group_t* group = keyboardGroup();
+        if (!group) {
+            return;
+        }
+
+        if (!_input_in_group) {
+            lv_group_add_obj(group, _input->raw_ptr());
+            _input_in_group = true;
+        }
+        lv_group_focus_obj(_input->raw_ptr());
+    }
+
+    void removeInputFromGroup()
+    {
+        if (!_input_in_group) {
+            return;
+        }
+
+        lv_group_remove_obj(_input->raw_ptr());
+        _input_in_group = false;
+    }
+
+    static void onInputValueChanged(lv_event_t* event)
+    {
+        auto* self = static_cast<FileConfirmDialog*>(lv_event_get_user_data(event));
+        if (!self || self->_updating_text) {
+            return;
+        }
+
+        const char* text = lv_textarea_get_text(self->_input->raw_ptr());
+        self->_view_model.setPendingRecordingName(text ? text : "");
+    }
+
+    static void onDiscardClicked(lv_event_t* event)
+    {
+        auto* self = static_cast<FileConfirmDialog*>(lv_event_get_user_data(event));
+        if (self) {
+            self->_view_model.discardPendingRecording();
+        }
+    }
+
+    static void onConfirmClicked(lv_event_t* event)
+    {
+        auto* self = static_cast<FileConfirmDialog*>(lv_event_get_user_data(event));
+        if (self) {
+            self->_view_model.confirmPendingRecording();
+        }
+    }
+};
+
 class RecordingView::PausedLabel {
 public:
     explicit PausedLabel(lv_obj_t* parent)
@@ -1033,18 +1247,29 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
     createWaveform(_view_model.waveformType().get());
-    _duration_panel = std::make_unique<DurationPanel>(_root->raw_ptr());
-    _paused_label   = std::make_unique<PausedLabel>(_root->raw_ptr());
+    _duration_panel      = std::make_unique<DurationPanel>(_root->raw_ptr());
+    _file_confirm_dialog = std::make_unique<FileConfirmDialog>(_root->raw_ptr(), _view_model);
+    _paused_label        = std::make_unique<PausedLabel>(_root->raw_ptr());
 
-    _key_bar              = std::make_unique<BottomKeyBar>(_root->raw_ptr());
-    _state_observer_id    = _view_model.state().observe(this, onStateChanged);
-    _elapsed_observer_id  = _view_model.elapsedSec().observe(this, onElapsedChanged);
-    _frame_observer_id    = _view_model.frame().observe(this, onFrameChanged);
-    _waveform_observer_id = _view_model.waveformType().observe(this, onWaveformTypeChanged);
+    _key_bar                  = std::make_unique<BottomKeyBar>(_root->raw_ptr());
+    _state_observer_id        = _view_model.state().observe(this, onStateChanged);
+    _elapsed_observer_id      = _view_model.elapsedSec().observe(this, onElapsedChanged);
+    _frame_observer_id        = _view_model.frame().observe(this, onFrameChanged);
+    _waveform_observer_id     = _view_model.waveformType().observe(this, onWaveformTypeChanged);
+    _pending_observer_id      = _view_model.pendingRecording().observe(this, onPendingRecordingChanged);
+    _pending_name_observer_id = _view_model.pendingRecordingName().observe(this, onPendingRecordingNameChanged);
 }
 
 void RecordingView::onExit()
 {
+    if (_pending_name_observer_id != 0) {
+        _view_model.pendingRecordingName().removeObserver(_pending_name_observer_id);
+        _pending_name_observer_id = 0;
+    }
+    if (_pending_observer_id != 0) {
+        _view_model.pendingRecording().removeObserver(_pending_observer_id);
+        _pending_observer_id = 0;
+    }
     if (_waveform_observer_id != 0) {
         _view_model.waveformType().removeObserver(_waveform_observer_id);
         _waveform_observer_id = 0;
@@ -1064,6 +1289,7 @@ void RecordingView::onExit()
 
     _key_bar.reset();
     _paused_label.reset();
+    _file_confirm_dialog.reset();
     _duration_panel.reset();
     _waveform.reset();
     _root.reset();
@@ -1162,6 +1388,20 @@ void RecordingView::renderWaveformType(RecordingWaveformType type)
     renderState(_view_model.state().get());
 }
 
+void RecordingView::renderPendingRecording(const PendingRecordingFile& pending)
+{
+    if (_file_confirm_dialog) {
+        _file_confirm_dialog->setPending(pending);
+    }
+}
+
+void RecordingView::renderPendingRecordingName(const std::string& name)
+{
+    if (_file_confirm_dialog) {
+        _file_confirm_dialog->setName(name);
+    }
+}
+
 void RecordingView::onStateChanged(void* context, const RecordingState& state)
 {
     auto* self = static_cast<RecordingView*>(context);
@@ -1191,6 +1431,22 @@ void RecordingView::onWaveformTypeChanged(void* context, const RecordingWaveform
     auto* self = static_cast<RecordingView*>(context);
     if (self) {
         self->renderWaveformType(type);
+    }
+}
+
+void RecordingView::onPendingRecordingChanged(void* context, const PendingRecordingFile& pending)
+{
+    auto* self = static_cast<RecordingView*>(context);
+    if (self) {
+        self->renderPendingRecording(pending);
+    }
+}
+
+void RecordingView::onPendingRecordingNameChanged(void* context, const std::string& name)
+{
+    auto* self = static_cast<RecordingView*>(context);
+    if (self) {
+        self->renderPendingRecordingName(name);
     }
 }
 
