@@ -5,6 +5,7 @@
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <widget/select_menu/smooth_selector.hpp>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <string>
 
@@ -63,13 +64,36 @@ constexpr float kSelectorShapeBounce      = 0.18f;
 constexpr float kCameraDuration           = 0.44f;
 constexpr uint32_t kMenuRenderIntervalMs  = 16;
 
+std::string durationDisplayText(uint32_t durationSec)
+{
+    const uint32_t hours   = durationSec / 3600;
+    const uint32_t minutes = durationSec / 60 % 60;
+    const uint32_t seconds = durationSec % 60;
+
+    if (hours > 0) {
+        return std::to_string(hours) + "h" + std::to_string(minutes) + "m";
+    }
+    if (minutes > 0) {
+        return std::to_string(minutes) + "m" + std::to_string(seconds) + "s";
+    }
+    return std::to_string(seconds) + "s";
+}
+
 std::string fileDisplayName(const RecordingFile& file)
 {
     const size_t slash = file.path.find_last_of("/\\");
-    if (slash == std::string::npos) {
-        return file.path;
+    std::string name   = slash == std::string::npos ? file.path : file.path.substr(slash + 1);
+
+    if (name.size() >= 4) {
+        std::string ext = name.substr(name.size() - 4);
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (ext == ".wav") {
+            name = name.substr(0, name.size() - 4);
+        }
     }
-    return file.path.substr(slash + 1);
+
+    return name + " (" + durationDisplayText(file.durationSec) + ")";
 }
 
 int32_t textWidth(const std::string& text)

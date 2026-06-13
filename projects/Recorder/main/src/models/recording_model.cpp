@@ -60,7 +60,7 @@ std::string makeRecordingPath()
 #endif
 
     std::ostringstream name;
-    name << dir << "/rec_" << std::put_time(&tm, "%Y%m%d_%H%M%S") << ".wav";
+    name << dir << "/" << std::put_time(&tm, "%Y%m%d_%H%M%S") << ".wav";
     return name.str();
 }
 
