@@ -17,7 +17,7 @@ namespace {
 constexpr int32_t kWaveformPanelWidth        = 256;
 constexpr int32_t kWaveformPanelHeight       = 90;
 constexpr int32_t kWaveformPanelX            = 0;
-constexpr int32_t kWaveformPanelY            = -33;
+constexpr int32_t kWaveformPanelY            = -21;
 constexpr int32_t kWaveformBarWidth          = 1;
 constexpr int32_t kWaveformBarPitch          = 3;
 constexpr int32_t kWaveformMinBarHeight      = 2;
@@ -25,7 +25,7 @@ constexpr int32_t kWaveformMaxBarHeight      = 86;
 constexpr size_t kWaveformBarCount           = 86;
 constexpr uint32_t kWaveformHistoryMs        = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs = kWaveformHistoryMs / kWaveformBarCount;
-constexpr float kWaveformGain                = 4.0f;
+constexpr float kWaveformGain                = 8.0f;
 constexpr int32_t kDurationPanelWidth        = 70;
 constexpr int32_t kDurationPanelHeight       = 18;
 constexpr int32_t kDurationPanelX            = 0;
@@ -33,7 +33,7 @@ constexpr int32_t kDurationPanelY            = 38;
 constexpr int32_t kDurationPanelHiddenWidth  = 18;
 constexpr int32_t kDurationPanelHiddenY      = 64;
 constexpr int32_t kPausedLabelX              = 0;
-constexpr int32_t kPausedLabelY              = 14;
+constexpr int32_t kPausedLabelY              = -75;
 constexpr float kPausedLabelFadeDuration     = 0.3f;
 
 }  // namespace
@@ -113,7 +113,7 @@ private:
 
         const float response = _target_amp >= _display_amp ? 0.42f : 0.32f;
         _display_amp += (_target_amp - _display_amp) * response;
-        _target_amp *= std::pow(0.03f, dt * 2.0f);
+        _target_amp *= std::pow(0.03f, dt * 6.0f);
         if (_target_amp < 0.0005f) {
             _target_amp = 0.0f;
         }
@@ -303,7 +303,7 @@ public:
 
         _label->setText("-PAUSED-");
         _label->setTextFont(&font_chivo_mono_medium_12);
-        _label->setTextColor(lv_color_hex(0xF0544D));
+        _label->setTextColor(lv_color_hex(0xFED40D));
         _label->setTextAlign(LV_TEXT_ALIGN_CENTER);
         _label->align(LV_ALIGN_CENTER, kPausedLabelX, kPausedLabelY);
         _label->setOpa(0);
