@@ -42,4 +42,4 @@ private:
     PlaybackModel& _model;
 };
 
-} // namespace recorder
+}  // namespace recorder

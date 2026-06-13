@@ -34,11 +34,11 @@ public:
     void tick(uint32_t nowMs);
 
 private:
-    smooth_ui_toolkit::Observable<PlaybackState> _state {PlaybackState::Stopped};
-    smooth_ui_toolkit::Observable<RecordingFile> _file {RecordingFile {}};
-    smooth_ui_toolkit::Observable<float> _progress_sec {0.0f};
-    smooth_ui_toolkit::Observable<float> _speed {1.0f};
+    smooth_ui_toolkit::Observable<PlaybackState> _state{PlaybackState::Stopped};
+    smooth_ui_toolkit::Observable<RecordingFile> _file{RecordingFile{}};
+    smooth_ui_toolkit::Observable<float> _progress_sec{0.0f};
+    smooth_ui_toolkit::Observable<float> _speed{1.0f};
     uint32_t _last_tick_ms = 0;
 };
 
-} // namespace recorder
+}  // namespace recorder

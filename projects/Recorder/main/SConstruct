@@ -47,12 +47,14 @@ if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
         for flag in sdl2_cflags:
             if flag.startswith('-I'):
                 sdl2_dir = flag[2:]
-                lvgl_component['INCLUDE'] += [os.path.dirname(sdl2_dir), sdl2_dir]
+                lvgl_component['INCLUDE'] += [
+                    os.path.dirname(sdl2_dir), sdl2_dir]
         for flag in pkg_config_ldflags('sdl2'):
             if flag.startswith('-L'):
                 lvgl_component['LINK_SEARCH_PATH'] += [flag[2:]]
         if not sdl2_cflags:
-            lvgl_component['INCLUDE'] += ['/opt/homebrew/include', '/opt/homebrew/include/SDL2']
+            lvgl_component['INCLUDE'] += ['/opt/homebrew/include',
+                                          '/opt/homebrew/include/SDL2']
             lvgl_component['LINK_SEARCH_PATH'] += ['/opt/homebrew/lib']
     else:
         lvgl_component['INCLUDE'] += ['/usr/include/SDL2']

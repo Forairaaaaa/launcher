@@ -16,7 +16,7 @@ public:
     RecorderApp();
     ~RecorderApp();
 
-    RecorderApp(const RecorderApp&) = delete;
+    RecorderApp(const RecorderApp&)            = delete;
     RecorderApp& operator=(const RecorderApp&) = delete;
 
     void start();
@@ -36,7 +36,7 @@ private:
     RecordingViewModel _recording_vm;
     FilesViewModel _files_vm;
     PlaybackViewModel _playback_vm;
-    ViewModel* _current_vm = nullptr;
+    ViewModel* _current_vm    = nullptr;
     size_t _route_observer_id = 0;
 
     std::array<ViewModel*, 3> _view_models;
@@ -47,4 +47,4 @@ private:
     static void onKeyboardEvent(lv_event_t* event);
 };
 
-} // namespace recorder
+}  // namespace recorder

@@ -33,4 +33,4 @@ private:
     PlaybackModel& _playback_model;
 };
 
-} // namespace recorder
+}  // namespace recorder

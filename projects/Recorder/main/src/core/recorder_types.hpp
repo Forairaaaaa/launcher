@@ -39,4 +39,4 @@ const char* pageIdName(PageId page);
 const char* recordingStateName(RecordingState state);
 const char* playbackStateName(PlaybackState state);
 
-} // namespace recorder
+}  // namespace recorder

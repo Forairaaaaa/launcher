@@ -37,4 +37,4 @@ private:
     RecordingModel& _model;
 };
 
-} // namespace recorder
+}  // namespace recorder

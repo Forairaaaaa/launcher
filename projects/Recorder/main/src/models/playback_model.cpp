@@ -23,7 +23,7 @@ void PlaybackModel::togglePlayPause()
 void PlaybackModel::seek(float offsetSec)
 {
     float duration = static_cast<float>(_file.get().durationSec);
-    float next = std::clamp(_progress_sec.get() + offsetSec, 0.0f, duration);
+    float next     = std::clamp(_progress_sec.get() + offsetSec, 0.0f, duration);
     _progress_sec.set(next);
 }
 
@@ -51,7 +51,7 @@ void PlaybackModel::tick(uint32_t nowMs)
         return;
     }
 
-    float dt = static_cast<float>(nowMs - _last_tick_ms) / 1000.0f;
+    float dt      = static_cast<float>(nowMs - _last_tick_ms) / 1000.0f;
     _last_tick_ms = nowMs;
     seek(dt * _speed.get());
 
@@ -60,4 +60,4 @@ void PlaybackModel::tick(uint32_t nowMs)
     }
 }
 
-} // namespace recorder
+}  // namespace recorder

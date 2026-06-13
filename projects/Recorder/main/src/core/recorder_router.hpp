@@ -23,8 +23,8 @@ public:
     void back();
 
 private:
-    smooth_ui_toolkit::Observable<PageId> _current_page {PageId::Recording};
+    smooth_ui_toolkit::Observable<PageId> _current_page{PageId::Recording};
     std::vector<PageId> _history;
 };
 
-} // namespace recorder
+}  // namespace recorder

@@ -31,4 +31,4 @@ void RecorderRouter::back()
     _current_page.set(previous);
 }
 
-} // namespace recorder
+}  // namespace recorder

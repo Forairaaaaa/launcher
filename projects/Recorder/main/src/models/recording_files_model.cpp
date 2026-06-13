@@ -5,7 +5,7 @@ namespace recorder {
 const RecordingFile* RecordingFilesModel::selectedFile() const
 {
     const auto& list = _files.get();
-    int index = _selected_index.get();
+    int index        = _selected_index.get();
     if (index < 0 || index >= static_cast<int>(list.size())) {
         return nullptr;
     }
@@ -59,4 +59,4 @@ void RecordingFilesModel::deleteSelected()
     _files.set(std::move(list));
 }
 
-} // namespace recorder
+}  // namespace recorder
