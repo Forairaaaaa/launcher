@@ -8,6 +8,7 @@
 #include <lvgl/number_flow/number_flow.hpp>
 #include <tools/ring_buffer/ring_buffer.hpp>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <vector>
@@ -35,6 +36,15 @@ constexpr uint32_t kWaveformHistoryMs            = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs     = kWaveformHistoryMs / kWaveformBarCount;
 constexpr uint32_t kLineWaveformSampleIntervalMs = kWaveformHistoryMs / kLineWaveformPointCount;
 constexpr float kWaveformGain                    = 8.0f;
+constexpr size_t kSiriWaveformLayerCount         = 3;
+constexpr size_t kSiriWaveformCurveCount         = 3;
+constexpr size_t kSiriWaveformPointCount         = 96;
+constexpr float kSiriWaveformGraphX              = 22.0f;
+constexpr float kSiriWaveformAttFactor           = 4.0f;
+constexpr float kSiriWaveformGain                = 18.0f;
+constexpr float kSiriWaveformIdleAmp             = 0.22f;
+constexpr float kSiriWaveformMaxAmp              = 0.9f;
+constexpr float kSiriWaveformResponse            = 0.18f;
 constexpr int32_t kDurationPanelWidth            = 70;
 constexpr int32_t kDurationPanelHeight           = 18;
 constexpr int32_t kDurationPanelX                = 0;
@@ -328,6 +338,218 @@ private:
     }
 };
 
+class SiriWaveformView : public RecordingWaveformViewBase {
+public:
+    explicit SiriWaveformView(lv_obj_t* parent) : RecordingWaveformViewBase(parent)
+    {
+        _panel->addEventCb(onDraw, LV_EVENT_DRAW_MAIN, this);
+    }
+
+    void setFrame(const AudioFrame& frame) override
+    {
+        float amp = frame.amp;
+        if (!frame.samples.empty()) {
+            float sample_sum = 0.0f;
+            for (float sample : frame.samples) {
+                sample_sum += std::abs(sample * 2.0f - 1.0f);
+            }
+            amp = std::max(amp, sample_sum / static_cast<float>(frame.samples.size()));
+        }
+        _target_amp = std::clamp(amp * kSiriWaveformGain, 0.0f, 1.0f);
+    }
+
+    void tick(uint32_t nowMs) override
+    {
+        float dt = 0.0f;
+        if (_last_tick_ms != 0 && nowMs >= _last_tick_ms) {
+            dt = static_cast<float>(nowMs - _last_tick_ms) / 1000.0f;
+        }
+        _last_tick_ms = nowMs;
+
+        _display_amp += (_target_amp - _display_amp) * kSiriWaveformResponse;
+        _target_amp *= std::pow(0.03f, dt * 4.0f);
+
+        const float phase_dt = dt == 0.0f ? 0.016f : dt;
+        for (auto& layer : _layers) {
+            for (auto& curve : layer.curves) {
+                curve.phase += curve.speed * phase_dt;
+                if (curve.phase > 6.2831853f) {
+                    curve.phase -= 6.2831853f;
+                }
+            }
+        }
+
+        RecordingWaveformViewBase::tick(nowMs);
+    }
+
+private:
+    struct Curve {
+        float amp;
+        float offset;
+        float speed;
+        float width;
+        float verse;
+    };
+
+    struct RuntimeCurve : public Curve {
+        float phase = 0.0f;
+    };
+
+    struct Layer {
+        lv_color_t color;
+        std::array<RuntimeCurve, kSiriWaveformCurveCount> curves;
+    };
+
+    float _target_amp      = 0.0f;
+    float _display_amp     = 0.0f;
+    uint32_t _last_tick_ms = 0;
+    std::array<Layer, kSiriWaveformLayerCount> _layers{{
+        {
+            lv_color_hex(0x0F52A9),
+            {{
+                {0.90f, -1.8f, 1.70f, 1.25f, 1.0f},
+                {0.55f, 0.2f, 1.25f, 2.20f, -1.0f},
+                {0.70f, 2.4f, 1.45f, 1.70f, 1.0f},
+            }},
+        },
+        {
+            lv_color_hex(0xAD394C),
+            {{
+                {0.75f, -2.6f, 1.35f, 1.55f, -1.0f},
+                {0.95f, -0.1f, 1.55f, 2.65f, 1.0f},
+                {0.50f, 1.7f, 1.15f, 1.85f, -1.0f},
+            }},
+        },
+        {
+            lv_color_hex(0x30DC9B),
+            {{
+                {0.60f, -1.1f, 1.20f, 2.85f, 1.0f},
+                {0.85f, 1.1f, 1.65f, 1.45f, -1.0f},
+                {0.65f, 2.8f, 1.40f, 2.10f, 1.0f},
+            }},
+        },
+    }};
+
+    static float globalAtt(float x)
+    {
+        return std::pow(kSiriWaveformAttFactor / (kSiriWaveformAttFactor + x * x), kSiriWaveformAttFactor);
+    }
+
+    float layerHeight(const Layer& layer, float graph_x) const
+    {
+        float y = 0.0f;
+        for (size_t i = 0; i < layer.curves.size(); ++i) {
+            const auto& curve = layer.curves[i];
+            const float spread =
+                4.0f * (-1.0f + static_cast<float>(i) * 2.0f / static_cast<float>(layer.curves.size() - 1));
+            const float x = graph_x / curve.width - (spread + curve.offset);
+            y += std::abs(curve.amp * std::sin(curve.verse * x - curve.phase) * globalAtt(x));
+        }
+
+        const float relative = y / static_cast<float>(layer.curves.size());
+        const float amp      = std::clamp(kSiriWaveformIdleAmp + _display_amp * kSiriWaveformMaxAmp, 0.0f, 1.0f);
+        return relative * globalAtt((graph_x / kSiriWaveformGraphX) * 2.0f) * amp;
+    }
+
+    void drawSiriLayer(lv_layer_t* layer, const lv_area_t& coords, const Layer& wave_layer)
+    {
+        lv_draw_line_dsc_t line_dsc;
+        lv_draw_line_dsc_init(&line_dsc);
+        line_dsc.color       = wave_layer.color;
+        line_dsc.width       = 2;
+        line_dsc.round_start = 1;
+        line_dsc.round_end   = 1;
+        line_dsc.opa         = 160;
+
+        const int32_t mid_y = coords.y1 + kWaveformPanelHeight / 2;
+        const float x_step =
+            static_cast<float>(kWaveformPanelWidth - 1) / static_cast<float>(kSiriWaveformPointCount - 1);
+        const float y_scale = static_cast<float>(kWaveformPanelHeight) * 1.8f;
+
+        bool has_previous_top    = false;
+        bool has_previous_bottom = false;
+        lv_point_precise_t previous_top{};
+        lv_point_precise_t previous_bottom{};
+
+        for (size_t i = 0; i < kSiriWaveformPointCount; ++i) {
+            const float ratio   = static_cast<float>(i) / static_cast<float>(kSiriWaveformPointCount - 1);
+            const float graph_x = ratio * kSiriWaveformGraphX * 2.0f - kSiriWaveformGraphX;
+            const float height  = layerHeight(wave_layer, graph_x) * y_scale;
+            const float x       = coords.x1 + x_step * static_cast<float>(i);
+
+            lv_point_precise_t top{};
+            top.x = x;
+            top.y = static_cast<float>(mid_y) - height;
+
+            lv_point_precise_t bottom{};
+            bottom.x = x;
+            bottom.y = static_cast<float>(mid_y) + height;
+
+            line_dsc.opa = static_cast<lv_opa_t>((160 * edgeOpacity(i, kSiriWaveformPointCount)) / LV_OPA_COVER);
+            if (has_previous_top) {
+                line_dsc.p1 = previous_top;
+                line_dsc.p2 = top;
+                lv_draw_line(layer, &line_dsc);
+            }
+            if (has_previous_bottom) {
+                line_dsc.p1 = previous_bottom;
+                line_dsc.p2 = bottom;
+                lv_draw_line(layer, &line_dsc);
+            }
+
+            previous_top        = top;
+            previous_bottom     = bottom;
+            has_previous_top    = true;
+            has_previous_bottom = true;
+        }
+    }
+
+    void drawSupportLine(lv_layer_t* layer, const lv_area_t& coords)
+    {
+        lv_draw_line_dsc_t line_dsc;
+        lv_draw_line_dsc_init(&line_dsc);
+        line_dsc.color = lv_color_hex(0xFFFFFF);
+        line_dsc.width = 1;
+
+        const int32_t mid_y = coords.y1 + kWaveformPanelHeight / 2;
+        const int32_t start_x =
+            coords.x1 + (kWaveformPanelWidth - ((kWaveformBarCount - 1) * kWaveformBarPitch + 1)) / 2;
+        for (size_t i = 0; i < kWaveformBarCount; ++i) {
+            const int32_t x = start_x + static_cast<int32_t>(i) * kWaveformBarPitch;
+            line_dsc.p1.x   = x;
+            line_dsc.p1.y   = mid_y;
+            line_dsc.p2.x   = x + 1;
+            line_dsc.p2.y   = mid_y;
+            line_dsc.opa    = static_cast<lv_opa_t>((70 * edgeOpacity(i, kWaveformBarCount)) / LV_OPA_COVER);
+            lv_draw_line(layer, &line_dsc);
+        }
+    }
+
+    void draw(lv_event_t* event)
+    {
+        lv_layer_t* layer = lv_event_get_layer(event);
+        if (!layer) {
+            return;
+        }
+
+        lv_area_t coords;
+        lv_obj_get_coords(_panel->raw_ptr(), &coords);
+
+        drawSupportLine(layer, coords);
+        for (const auto& wave_layer : _layers) {
+            drawSiriLayer(layer, coords, wave_layer);
+        }
+    }
+
+    static void onDraw(lv_event_t* event)
+    {
+        auto* self = static_cast<SiriWaveformView*>(lv_event_get_user_data(event));
+        if (self) {
+            self->draw(event);
+        }
+    }
+};
+
 class RecordingView::DurationPanel {
 public:
     explicit DurationPanel(lv_obj_t* parent)
@@ -520,6 +742,9 @@ void RecordingView::createWaveform(RecordingWaveformType type)
             break;
         case RecordingWaveformType::Line:
             _waveform = std::make_unique<LineWaveformView>(_root->raw_ptr());
+            break;
+        case RecordingWaveformType::Siri:
+            _waveform = std::make_unique<SiriWaveformView>(_root->raw_ptr());
             break;
     }
 

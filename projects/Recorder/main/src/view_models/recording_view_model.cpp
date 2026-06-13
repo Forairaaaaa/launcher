@@ -11,6 +11,8 @@ RecordingWaveformType nextWaveformType(RecordingWaveformType type)
         case RecordingWaveformType::Basic:
             return RecordingWaveformType::Line;
         case RecordingWaveformType::Line:
+            return RecordingWaveformType::Siri;
+        case RecordingWaveformType::Siri:
             return RecordingWaveformType::Basic;
     }
     return RecordingWaveformType::Basic;
@@ -23,6 +25,8 @@ const char* waveformTypeName(RecordingWaveformType type)
             return "Basic";
         case RecordingWaveformType::Line:
             return "Line";
+        case RecordingWaveformType::Siri:
+            return "Siri";
     }
     return "Unknown";
 }
