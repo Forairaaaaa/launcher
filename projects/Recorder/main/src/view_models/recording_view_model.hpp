@@ -5,6 +5,11 @@
 
 namespace recorder {
 
+enum class RecordingWaveformType {
+    Basic,
+    Line,
+};
+
 class RecordingViewModel : public ViewModel {
 public:
     RecordingViewModel(RecorderRouter& router, RecordingModel& model);
@@ -38,8 +43,14 @@ public:
         return _model.elapsedSec();
     }
 
+    smooth_ui_toolkit::Observable<RecordingWaveformType>& waveformType()
+    {
+        return _waveform_type;
+    }
+
 private:
     RecordingModel& _model;
+    smooth_ui_toolkit::Observable<RecordingWaveformType> _waveform_type{RecordingWaveformType::Basic};
 };
 
 }  // namespace recorder

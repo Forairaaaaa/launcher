@@ -3,6 +3,32 @@
 
 namespace recorder {
 
+namespace {
+
+RecordingWaveformType nextWaveformType(RecordingWaveformType type)
+{
+    switch (type) {
+        case RecordingWaveformType::Basic:
+            return RecordingWaveformType::Line;
+        case RecordingWaveformType::Line:
+            return RecordingWaveformType::Basic;
+    }
+    return RecordingWaveformType::Basic;
+}
+
+const char* waveformTypeName(RecordingWaveformType type)
+{
+    switch (type) {
+        case RecordingWaveformType::Basic:
+            return "Basic";
+        case RecordingWaveformType::Line:
+            return "Line";
+    }
+    return "Unknown";
+}
+
+}  // namespace
+
 RecordingViewModel::RecordingViewModel(RecorderRouter& router, RecordingModel& model) : ViewModel(router), _model(model)
 {
 }
@@ -15,6 +41,12 @@ void RecordingViewModel::onEnter()
 void RecordingViewModel::onKey(uint32_t key)
 {
     switch (key) {
+        case '4': {
+            RecordingWaveformType next_type = nextWaveformType(_waveform_type.get());
+            spdlog::info("RecordingViewModel: switch waveform type={}", waveformTypeName(next_type));
+            _waveform_type.set(next_type);
+            break;
+        }
         case '5':
             if (_model.state().get() == RecordingState::Recording) {
                 _model.pause();

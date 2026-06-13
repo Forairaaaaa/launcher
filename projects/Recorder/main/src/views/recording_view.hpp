@@ -33,16 +33,20 @@ private:
     std::unique_ptr<DurationPanel> _duration_panel;
     std::unique_ptr<PausedLabel> _paused_label;
     std::unique_ptr<BottomKeyBar> _key_bar;
-    size_t _state_observer_id   = 0;
-    size_t _elapsed_observer_id = 0;
-    size_t _frame_observer_id   = 0;
+    size_t _state_observer_id    = 0;
+    size_t _elapsed_observer_id  = 0;
+    size_t _frame_observer_id    = 0;
+    size_t _waveform_observer_id = 0;
 
+    void createWaveform(RecordingWaveformType type);
     void renderState(RecordingState state);
     void renderElapsed(uint32_t elapsed_sec);
     void renderFrame(const AudioFrame& frame);
+    void renderWaveformType(RecordingWaveformType type);
     static void onStateChanged(void* context, const RecordingState& state);
     static void onElapsedChanged(void* context, const uint32_t& elapsed_sec);
     static void onFrameChanged(void* context, const AudioFrame& frame);
+    static void onWaveformTypeChanged(void* context, const RecordingWaveformType& type);
 };
 
 }  // namespace recorder

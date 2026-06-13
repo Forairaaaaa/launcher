@@ -10,52 +10,47 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 namespace recorder {
 
 namespace {
 
-constexpr int32_t kWaveformPanelWidth        = 256;
-constexpr int32_t kWaveformPanelHeight       = 90;
-constexpr int32_t kWaveformPanelX            = 0;
-constexpr int32_t kWaveformPanelY            = -21;
-constexpr uint32_t kWaveformIdleColor        = 0xFED40D;
-constexpr uint32_t kWaveformRecordingColor   = 0xF0544D;
-constexpr float kWaveformColorDuration       = 0.4f;
-constexpr int32_t kWaveformBarWidth          = 1;
-constexpr int32_t kWaveformBarPitch          = 3;
-constexpr int32_t kWaveformMinBarHeight      = 2;
-constexpr int32_t kWaveformMaxBarHeight      = 86;
-constexpr size_t kWaveformBarCount           = 86;
-constexpr size_t kWaveformEdgeFadeBarCount   = 3;
-constexpr uint32_t kWaveformHistoryMs        = 3000;
-constexpr uint32_t kWaveformSampleIntervalMs = kWaveformHistoryMs / kWaveformBarCount;
-constexpr float kWaveformGain                = 8.0f;
-constexpr int32_t kDurationPanelWidth        = 70;
-constexpr int32_t kDurationPanelHeight       = 18;
-constexpr int32_t kDurationPanelX            = 0;
-constexpr int32_t kDurationPanelY            = 38;
-constexpr int32_t kDurationPanelHiddenWidth  = 18;
-constexpr int32_t kDurationPanelHiddenY      = 64;
-constexpr int32_t kPausedLabelX              = 0;
-constexpr int32_t kPausedLabelY              = -75;
-constexpr float kPausedLabelFadeDuration     = 0.3f;
+constexpr int32_t kWaveformPanelWidth            = 256;
+constexpr int32_t kWaveformPanelHeight           = 90;
+constexpr int32_t kWaveformPanelX                = 0;
+constexpr int32_t kWaveformPanelY                = -21;
+constexpr uint32_t kWaveformIdleColor            = 0xFED40D;
+constexpr uint32_t kWaveformRecordingColor       = 0xF0544D;
+constexpr float kWaveformColorDuration           = 0.4f;
+constexpr int32_t kWaveformBarWidth              = 1;
+constexpr int32_t kWaveformBarPitch              = 3;
+constexpr int32_t kWaveformMinBarHeight          = 2;
+constexpr int32_t kWaveformMaxBarHeight          = 86;
+constexpr size_t kWaveformBarCount               = 86;
+constexpr size_t kWaveformEdgeFadeBarCount       = 3;
+constexpr size_t kLineWaveformPointCount         = 128;
+constexpr float kLineWaveformGain                = 8.0f;
+constexpr uint32_t kWaveformHistoryMs            = 3000;
+constexpr uint32_t kWaveformSampleIntervalMs     = kWaveformHistoryMs / kWaveformBarCount;
+constexpr uint32_t kLineWaveformSampleIntervalMs = kWaveformHistoryMs / kLineWaveformPointCount;
+constexpr float kWaveformGain                    = 8.0f;
+constexpr int32_t kDurationPanelWidth            = 70;
+constexpr int32_t kDurationPanelHeight           = 18;
+constexpr int32_t kDurationPanelX                = 0;
+constexpr int32_t kDurationPanelY                = 38;
+constexpr int32_t kDurationPanelHiddenWidth      = 18;
+constexpr int32_t kDurationPanelHiddenY          = 64;
+constexpr int32_t kPausedLabelX                  = 0;
+constexpr int32_t kPausedLabelY                  = -75;
+constexpr float kPausedLabelFadeDuration         = 0.3f;
 
 }  // namespace
 
 class RecordingWaveformViewBase {
 public:
-    virtual ~RecordingWaveformViewBase() = default;
-
-    virtual void setFrame(const AudioFrame& frame) = 0;
-    virtual void setRecording(bool recording)      = 0;
-    virtual void tick(uint32_t nowMs)              = 0;
-};
-
-class BasicWaveformView : public RecordingWaveformViewBase {
-public:
-    explicit BasicWaveformView(lv_obj_t* parent)
-        : _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent))
+    explicit RecordingWaveformViewBase(lv_obj_t* parent)
+        : _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent)), _color(kWaveformIdleColor)
     {
         _color.duration       = kWaveformColorDuration;
         _color.easingFunction = smooth_ui_toolkit::ease::ease_out_quad;
@@ -69,6 +64,51 @@ public:
         _panel->setPaddingAll(0);
         _panel->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
         _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+    }
+
+    virtual ~RecordingWaveformViewBase() = default;
+
+    virtual void setFrame(const AudioFrame& frame) = 0;
+
+    virtual void setRecording(bool recording)
+    {
+        _color.move(recording ? kWaveformRecordingColor : kWaveformIdleColor);
+    }
+
+    virtual void tick(uint32_t nowMs)
+    {
+        (void)nowMs;
+        _color.update();
+        lv_obj_invalidate(_panel->raw_ptr());
+    }
+
+protected:
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
+
+    lv_color_t currentColor() const
+    {
+        return lv_color_hex(_color.toHex());
+    }
+
+    static lv_opa_t edgeOpacity(size_t index, size_t count)
+    {
+        const size_t edge_distance = std::min(index, count - 1 - index);
+        if (edge_distance >= kWaveformEdgeFadeBarCount) {
+            return LV_OPA_COVER;
+        }
+
+        const size_t fade_step = edge_distance + 1;
+        return static_cast<lv_opa_t>((LV_OPA_COVER * fade_step) / (kWaveformEdgeFadeBarCount + 1));
+    }
+
+private:
+    smooth_ui_toolkit::color::AnimateRgb_t _color;
+};
+
+class BasicWaveformView : public RecordingWaveformViewBase {
+public:
+    explicit BasicWaveformView(lv_obj_t* parent) : RecordingWaveformViewBase(parent)
+    {
         _panel->addEventCb(onDraw, LV_EVENT_DRAW_MAIN, this);
 
         for (size_t i = 0; i < kWaveformBarCount; ++i) {
@@ -89,15 +129,9 @@ public:
         _target_amp = std::max(_target_amp, std::clamp(amp, 0.0f, 1.0f));
     }
 
-    void setRecording(bool recording) override
-    {
-        _color.move(recording ? kWaveformRecordingColor : kWaveformIdleColor);
-    }
-
     void tick(uint32_t nowMs) override
     {
         updateAmp(nowMs);
-        _color.update();
 
         if (_last_sample_ms == 0) {
             _last_sample_ms = nowMs;
@@ -108,13 +142,11 @@ public:
             _last_sample_ms += kWaveformSampleIntervalMs;
         }
 
-        lv_obj_invalidate(_panel->raw_ptr());
+        RecordingWaveformViewBase::tick(nowMs);
     }
 
 private:
-    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
     smooth_ui_toolkit::RingBuffer<float, kWaveformBarCount> _bars;
-    smooth_ui_toolkit::color::AnimateRgb_t _color{kWaveformIdleColor};
     float _target_amp        = 0.0f;
     float _display_amp       = 0.0f;
     uint32_t _last_tick_ms   = 0;
@@ -145,17 +177,6 @@ private:
         return std::pow(gained, 0.68f);
     }
 
-    static lv_opa_t barOpacity(size_t index)
-    {
-        const size_t edge_distance = std::min(index, kWaveformBarCount - 1 - index);
-        if (edge_distance >= kWaveformEdgeFadeBarCount) {
-            return LV_OPA_COVER;
-        }
-
-        const size_t fade_step = edge_distance + 1;
-        return static_cast<lv_opa_t>((LV_OPA_COVER * fade_step) / (kWaveformEdgeFadeBarCount + 1));
-    }
-
     void draw(lv_event_t* event)
     {
         lv_layer_t* layer = lv_event_get_layer(event);
@@ -168,7 +189,7 @@ private:
 
         lv_draw_line_dsc_t line_dsc;
         lv_draw_line_dsc_init(&line_dsc);
-        line_dsc.color = lv_color_hex(_color.toHex());
+        line_dsc.color = currentColor();
         line_dsc.width = kWaveformBarWidth;
         line_dsc.opa   = LV_OPA_COVER;
 
@@ -189,7 +210,7 @@ private:
             line_dsc.p1.y      = mid_y - half;
             line_dsc.p2.x      = x;
             line_dsc.p2.y      = mid_y + half;
-            line_dsc.opa       = barOpacity(index);
+            line_dsc.opa       = edgeOpacity(index, kWaveformBarCount);
             lv_draw_line(layer, &line_dsc);
             ++index;
         });
@@ -198,6 +219,109 @@ private:
     static void onDraw(lv_event_t* event)
     {
         auto* self = static_cast<BasicWaveformView*>(lv_event_get_user_data(event));
+        if (self) {
+            self->draw(event);
+        }
+    }
+};
+
+class LineWaveformView : public RecordingWaveformViewBase {
+public:
+    explicit LineWaveformView(lv_obj_t* parent) : RecordingWaveformViewBase(parent)
+    {
+        _panel->addEventCb(onDraw, LV_EVENT_DRAW_MAIN, this);
+
+        for (size_t i = 0; i < kLineWaveformPointCount; ++i) {
+            _points.push(0.0f);
+        }
+    }
+
+    void setFrame(const AudioFrame& frame) override
+    {
+        _samples = frame.samples;
+        if (_sample_cursor >= _samples.size()) {
+            _sample_cursor = 0;
+        }
+    }
+
+    void tick(uint32_t nowMs) override
+    {
+        if (_last_sample_ms == 0) {
+            _last_sample_ms = nowMs;
+        }
+
+        while (nowMs - _last_sample_ms >= kLineWaveformSampleIntervalMs) {
+            _points.push(nextPoint());
+            _last_sample_ms += kLineWaveformSampleIntervalMs;
+        }
+
+        RecordingWaveformViewBase::tick(nowMs);
+    }
+
+private:
+    smooth_ui_toolkit::RingBuffer<float, kLineWaveformPointCount> _points;
+    std::vector<float> _samples;
+    size_t _sample_cursor    = 0;
+    uint32_t _last_sample_ms = 0;
+
+    float nextPoint()
+    {
+        if (_samples.empty()) {
+            return 0.0f;
+        }
+
+        const float sample = _samples[_sample_cursor];
+        _sample_cursor     = (_sample_cursor + 1) % _samples.size();
+        return std::clamp((sample * 2.0f - 1.0f) * kLineWaveformGain, -1.0f, 1.0f);
+    }
+
+    void draw(lv_event_t* event)
+    {
+        lv_layer_t* layer = lv_event_get_layer(event);
+        if (!layer) {
+            return;
+        }
+
+        lv_area_t coords;
+        lv_obj_get_coords(_panel->raw_ptr(), &coords);
+
+        lv_draw_line_dsc_t line_dsc;
+        lv_draw_line_dsc_init(&line_dsc);
+        line_dsc.color = currentColor();
+        line_dsc.width = kWaveformBarWidth;
+        line_dsc.opa   = LV_OPA_COVER;
+
+        const int32_t mid_y = coords.y1 + kWaveformPanelHeight / 2;
+        const float x_step =
+            static_cast<float>(kWaveformPanelWidth - 1) / static_cast<float>(kLineWaveformPointCount - 1);
+        const float y_scale = static_cast<float>(kWaveformMaxBarHeight) * 0.5f;
+
+        bool has_previous = false;
+        lv_point_precise_t previous{};
+        size_t index = 0;
+        _points.peekAll([&](const float& value, bool& stopPeeking) {
+            (void)stopPeeking;
+
+            lv_point_precise_t current{};
+            current.x = coords.x1 + x_step * static_cast<float>(index);
+            current.y = mid_y - std::clamp(value, -1.0f, 1.0f) * y_scale;
+
+            if (has_previous) {
+                line_dsc.p1  = previous;
+                line_dsc.p2  = current;
+                line_dsc.opa = edgeOpacity(index, kLineWaveformPointCount);
+                lv_draw_line(layer, &line_dsc);
+            }
+
+            previous     = current;
+            has_previous = true;
+            ++index;
+        });
+    }
+
+    static void onDraw(lv_event_t* event)
+    {
+        auto* self = static_cast<LineWaveformView*>(lv_event_get_user_data(event));
         if (self) {
             self->draw(event);
         }
@@ -384,6 +508,25 @@ RecordingView::~RecordingView()
     onExit();
 }
 
+void RecordingView::createWaveform(RecordingWaveformType type)
+{
+    if (!_root) {
+        return;
+    }
+
+    switch (type) {
+        case RecordingWaveformType::Basic:
+            _waveform = std::make_unique<BasicWaveformView>(_root->raw_ptr());
+            break;
+        case RecordingWaveformType::Line:
+            _waveform = std::make_unique<LineWaveformView>(_root->raw_ptr());
+            break;
+    }
+
+    _waveform->setRecording(_view_model.state().get() == RecordingState::Recording);
+    _waveform->setFrame(_view_model.frame().get());
+}
+
 void RecordingView::onEnter(lv_obj_t* parent)
 {
     onExit();
@@ -397,18 +540,23 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _root->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
-    _waveform       = std::make_unique<BasicWaveformView>(_root->raw_ptr());
+    createWaveform(_view_model.waveformType().get());
     _duration_panel = std::make_unique<DurationPanel>(_root->raw_ptr());
     _paused_label   = std::make_unique<PausedLabel>(_root->raw_ptr());
 
-    _key_bar             = std::make_unique<BottomKeyBar>(_root->raw_ptr());
-    _state_observer_id   = _view_model.state().observe(this, onStateChanged);
-    _elapsed_observer_id = _view_model.elapsedSec().observe(this, onElapsedChanged);
-    _frame_observer_id   = _view_model.frame().observe(this, onFrameChanged);
+    _key_bar              = std::make_unique<BottomKeyBar>(_root->raw_ptr());
+    _state_observer_id    = _view_model.state().observe(this, onStateChanged);
+    _elapsed_observer_id  = _view_model.elapsedSec().observe(this, onElapsedChanged);
+    _frame_observer_id    = _view_model.frame().observe(this, onFrameChanged);
+    _waveform_observer_id = _view_model.waveformType().observe(this, onWaveformTypeChanged);
 }
 
 void RecordingView::onExit()
 {
+    if (_waveform_observer_id != 0) {
+        _view_model.waveformType().removeObserver(_waveform_observer_id);
+        _waveform_observer_id = 0;
+    }
     if (_frame_observer_id != 0) {
         _view_model.frame().removeObserver(_frame_observer_id);
         _frame_observer_id = 0;
@@ -513,6 +661,11 @@ void RecordingView::renderFrame(const AudioFrame& frame)
     }
 }
 
+void RecordingView::renderWaveformType(RecordingWaveformType type)
+{
+    createWaveform(type);
+}
+
 void RecordingView::onStateChanged(void* context, const RecordingState& state)
 {
     auto* self = static_cast<RecordingView*>(context);
@@ -534,6 +687,14 @@ void RecordingView::onFrameChanged(void* context, const AudioFrame& frame)
     auto* self = static_cast<RecordingView*>(context);
     if (self) {
         self->renderFrame(frame);
+    }
+}
+
+void RecordingView::onWaveformTypeChanged(void* context, const RecordingWaveformType& type)
+{
+    auto* self = static_cast<RecordingView*>(context);
+    if (self) {
+        self->renderWaveformType(type);
     }
 }
 
