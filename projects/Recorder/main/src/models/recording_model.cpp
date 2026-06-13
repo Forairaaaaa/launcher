@@ -28,6 +28,7 @@ constexpr ma_uint32 kCaptureSampleRate = 48000;
 constexpr ma_format kCaptureFormat     = ma_format_f32;
 constexpr size_t kPreviewSampleCount   = 24;
 constexpr auto kStartCooldown          = std::chrono::milliseconds(800);
+constexpr auto kMonitorRetryInterval   = std::chrono::milliseconds(2000);
 
 std::string makeRecordingPath()
 {
@@ -91,23 +92,124 @@ struct RecordingModel::Impl {
     bool has_capture_device_id = false;
 
     std::string current_path;
+    std::mutex encoder_mutex;
     std::mutex frame_mutex;
     AudioFrame latest_frame;
     bool has_new_frame = false;
     std::atomic<uint64_t> captured_frames{0};
+    std::atomic<bool> writing_enabled{false};
     std::chrono::steady_clock::time_point next_start_time{};
+    std::chrono::steady_clock::time_point next_monitor_retry_time{};
 
     ~Impl()
     {
         cleanup();
     }
 
-    bool start()
+    bool ensureMonitor()
     {
-        cleanup();
+        if (device_inited) {
+            return true;
+        }
+
+        auto now = std::chrono::steady_clock::now();
+        if (now < next_monitor_retry_time) {
+            return false;
+        }
+
+        if (startMonitor()) {
+            return true;
+        }
+
+        next_monitor_retry_time = now + kMonitorRetryInterval;
+        return false;
+    }
+
+    bool startRecording()
+    {
+        if (!ensureMonitor()) {
+            spdlog::error("RecordingModel: start recording failed, capture monitor is unavailable");
+            return false;
+        }
 
         current_path = makeRecordingPath();
         captured_frames.store(0);
+
+        ma_encoder_config encoder_config =
+            ma_encoder_config_init(ma_encoding_format_wav, kCaptureFormat, kCaptureChannels, kCaptureSampleRate);
+        {
+            std::lock_guard<std::mutex> lock(encoder_mutex);
+            cleanupEncoderLocked();
+
+            ma_result result = ma_encoder_init_file(current_path.c_str(), &encoder_config, &encoder);
+            if (result != MA_SUCCESS) {
+                spdlog::error("RecordingModel: ma_encoder_init_file failed, result={} {}, path={}",
+                              static_cast<int>(result), maResultName(result), current_path);
+                current_path.clear();
+                return false;
+            }
+            encoder_inited = true;
+        }
+
+        writing_enabled.store(true);
+        spdlog::info("RecordingModel: started recording path={}, channels={}, sampleRate={}", current_path,
+                     kCaptureChannels, kCaptureSampleRate);
+        return true;
+    }
+
+    bool pauseRecording()
+    {
+        {
+            std::lock_guard<std::mutex> lock(encoder_mutex);
+            if (!encoder_inited) {
+                return false;
+            }
+        }
+
+        writing_enabled.store(false);
+        spdlog::info("RecordingModel: paused recording path={}, capturedFrames={}", current_path,
+                     captured_frames.load());
+        return true;
+    }
+
+    bool resumeRecording()
+    {
+        {
+            std::lock_guard<std::mutex> lock(encoder_mutex);
+            if (!encoder_inited) {
+                return false;
+            }
+        }
+
+        writing_enabled.store(true);
+        spdlog::info("RecordingModel: resumed recording path={}", current_path);
+        return true;
+    }
+
+    void stopRecording()
+    {
+        writing_enabled.store(false);
+
+        uint64_t frames  = captured_frames.load();
+        std::string path = current_path;
+
+        {
+            std::lock_guard<std::mutex> lock(encoder_mutex);
+            cleanupEncoderLocked();
+        }
+        current_path.clear();
+
+        float duration_sec = kCaptureSampleRate == 0 ? 0.0f : static_cast<float>(frames) / kCaptureSampleRate;
+        if (!path.empty()) {
+            spdlog::info("RecordingModel: stopped recording path={}, frames={}, duration={:.2f}s", path, frames,
+                         duration_sec);
+        }
+    }
+
+    bool startMonitor()
+    {
+        cleanup();
+
         {
             std::lock_guard<std::mutex> lock(frame_mutex);
             latest_frame = AudioFrame{};
@@ -123,17 +225,6 @@ struct RecordingModel::Impl {
         logCaptureDevices();
         selectCaptureDevice();
 
-        ma_encoder_config encoder_config =
-            ma_encoder_config_init(ma_encoding_format_wav, kCaptureFormat, kCaptureChannels, kCaptureSampleRate);
-        ma_result result = ma_encoder_init_file(current_path.c_str(), &encoder_config, &encoder);
-        if (result != MA_SUCCESS) {
-            spdlog::error("RecordingModel: ma_encoder_init_file failed, result={} {}, path={}",
-                          static_cast<int>(result), maResultName(result), current_path);
-            cleanup();
-            return false;
-        }
-        encoder_inited = true;
-
         ma_device_config device_config  = ma_device_config_init(ma_device_type_capture);
         device_config.capture.format    = kCaptureFormat;
         device_config.capture.channels  = kCaptureChannels;
@@ -142,7 +233,7 @@ struct RecordingModel::Impl {
         device_config.dataCallback      = dataCallback;
         device_config.pUserData         = this;
 
-        result = ma_device_init(&context, &device_config, &device);
+        ma_result result = ma_device_init(&context, &device_config, &device);
         if (result != MA_SUCCESS) {
             spdlog::error("RecordingModel: ma_device_init capture failed, result={} {}", static_cast<int>(result),
                           maResultName(result));
@@ -159,58 +250,9 @@ struct RecordingModel::Impl {
             return false;
         }
 
-        spdlog::info("RecordingModel: started recording path={}, channels={}, sampleRate={}", current_path,
-                     kCaptureChannels, kCaptureSampleRate);
+        spdlog::info("RecordingModel: capture monitor started, channels={}, sampleRate={}", kCaptureChannels,
+                     kCaptureSampleRate);
         return true;
-    }
-
-    bool pause()
-    {
-        if (!device_inited) {
-            return false;
-        }
-
-        ma_result result = ma_device_stop(&device);
-        if (result != MA_SUCCESS) {
-            spdlog::error("RecordingModel: ma_device_stop for pause failed, result={} {}", static_cast<int>(result),
-                          maResultName(result));
-            return false;
-        }
-
-        spdlog::info("RecordingModel: paused recording path={}, capturedFrames={}", current_path,
-                     captured_frames.load());
-        return true;
-    }
-
-    bool resume()
-    {
-        if (!device_inited) {
-            return false;
-        }
-
-        ma_result result = ma_device_start(&device);
-        if (result != MA_SUCCESS) {
-            spdlog::error("RecordingModel: ma_device_start for resume failed, result={} {}", static_cast<int>(result),
-                          maResultName(result));
-            return false;
-        }
-
-        spdlog::info("RecordingModel: resumed recording path={}", current_path);
-        return true;
-    }
-
-    void stop()
-    {
-        uint64_t frames  = captured_frames.load();
-        std::string path = current_path;
-
-        cleanup();
-
-        float duration_sec = kCaptureSampleRate == 0 ? 0.0f : static_cast<float>(frames) / kCaptureSampleRate;
-        if (!path.empty()) {
-            spdlog::info("RecordingModel: stopped recording path={}, frames={}, duration={:.2f}s", path, frames,
-                         duration_sec);
-        }
     }
 
     bool consumeFrame(AudioFrame& out)
@@ -250,14 +292,16 @@ struct RecordingModel::Impl {
 
     void cleanup()
     {
+        writing_enabled.store(false);
+
         if (device_inited) {
             ma_device_uninit(&device);
             device_inited = false;
         }
 
-        if (encoder_inited) {
-            ma_encoder_uninit(&encoder);
-            encoder_inited = false;
+        {
+            std::lock_guard<std::mutex> lock(encoder_mutex);
+            cleanupEncoderLocked();
         }
 
         if (context_inited) {
@@ -267,6 +311,14 @@ struct RecordingModel::Impl {
 
         has_capture_device_id = false;
         current_path.clear();
+    }
+
+    void cleanupEncoderLocked()
+    {
+        if (encoder_inited) {
+            ma_encoder_uninit(&encoder);
+            encoder_inited = false;
+        }
     }
 
     bool initContext()
@@ -352,8 +404,15 @@ struct RecordingModel::Impl {
 
         const auto* samples      = static_cast<const float*>(input);
         ma_uint64 frames_written = 0;
-        ma_encoder_write_pcm_frames(&self->encoder, input, frame_count, &frames_written);
-        self->captured_frames.fetch_add(frames_written);
+        if (self->writing_enabled.load()) {
+            std::lock_guard<std::mutex> lock(self->encoder_mutex);
+            if (self->encoder_inited && self->writing_enabled.load()) {
+                ma_encoder_write_pcm_frames(&self->encoder, input, frame_count, &frames_written);
+            }
+        }
+        if (frames_written > 0) {
+            self->captured_frames.fetch_add(frames_written);
+        }
 
         AudioFrame frame;
         frame.samples.assign(kPreviewSampleCount, 0.0f);
@@ -381,6 +440,7 @@ struct RecordingModel::Impl {
 
 RecordingModel::RecordingModel() : _impl(std::make_unique<Impl>())
 {
+    _impl->ensureMonitor();
 }
 
 RecordingModel::~RecordingModel()
@@ -406,14 +466,12 @@ void RecordingModel::start()
     }
 
     spdlog::info("RecordingModel: start requested");
-    if (_impl->start()) {
+    if (_impl->startRecording()) {
         _elapsed_sec.set(0);
         _state.set(RecordingState::Recording);
     } else {
         _impl->armStartCooldown();
         _state.set(RecordingState::Idle);
-        _mic_amp.set(0.0f);
-        _frame.set(AudioFrame{});
         _elapsed_sec.set(0);
     }
 }
@@ -429,11 +487,9 @@ void RecordingModel::stop()
     }
 
     spdlog::info("RecordingModel: stop requested");
-    _impl->stop();
+    _impl->stopRecording();
     _impl->armStartCooldown();
     _state.set(RecordingState::Idle);
-    _mic_amp.set(0.0f);
-    _frame.set(AudioFrame{});
     _elapsed_sec.set(0);
 }
 
@@ -441,7 +497,7 @@ void RecordingModel::pause()
 {
     if (_state.get() == RecordingState::Recording) {
         spdlog::info("RecordingModel: pause requested");
-        if (_impl->pause()) {
+        if (_impl->pauseRecording()) {
             _state.set(RecordingState::Paused);
         }
     }
@@ -451,7 +507,7 @@ void RecordingModel::resume()
 {
     if (_state.get() == RecordingState::Paused) {
         spdlog::info("RecordingModel: resume requested");
-        if (_impl->resume()) {
+        if (_impl->resumeRecording()) {
             _state.set(RecordingState::Recording);
         }
     }
@@ -461,11 +517,9 @@ void RecordingModel::tick(uint32_t nowMs)
 {
     (void)nowMs;
 
-    if (_state.get() != RecordingState::Recording) {
-        return;
-    }
+    _impl->ensureMonitor();
 
-    const uint32_t elapsed_sec = _impl->elapsedSec();
+    const uint32_t elapsed_sec = _state.get() == RecordingState::Idle ? 0 : _impl->elapsedSec();
     if (_elapsed_sec.get() != elapsed_sec) {
         _elapsed_sec.set(elapsed_sec);
     }

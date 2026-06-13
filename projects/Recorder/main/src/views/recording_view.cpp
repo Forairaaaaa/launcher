@@ -5,24 +5,175 @@
 #include <core/easing/ease.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/number_flow/number_flow.hpp>
+#include <tools/ring_buffer/ring_buffer.hpp>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace recorder {
 
 namespace {
 
-constexpr int32_t kDurationPanelWidth       = 70;
-constexpr int32_t kDurationPanelHeight      = 18;
-constexpr int32_t kDurationPanelX           = 0;
-constexpr int32_t kDurationPanelY           = 38;
-constexpr int32_t kDurationPanelHiddenWidth = 18;
-constexpr int32_t kDurationPanelHiddenY     = 64;
-constexpr int32_t kPausedLabelX             = 0;
-constexpr int32_t kPausedLabelY             = 14;
-constexpr float kPausedLabelFadeDuration    = 0.3f;
+constexpr int32_t kWaveformPanelWidth        = 256;
+constexpr int32_t kWaveformPanelHeight       = 90;
+constexpr int32_t kWaveformPanelX            = 0;
+constexpr int32_t kWaveformPanelY            = -33;
+constexpr int32_t kWaveformBarWidth          = 1;
+constexpr int32_t kWaveformBarPitch          = 3;
+constexpr int32_t kWaveformMinBarHeight      = 2;
+constexpr int32_t kWaveformMaxBarHeight      = 86;
+constexpr size_t kWaveformBarCount           = 86;
+constexpr uint32_t kWaveformHistoryMs        = 3000;
+constexpr uint32_t kWaveformSampleIntervalMs = kWaveformHistoryMs / kWaveformBarCount;
+constexpr float kWaveformGain                = 8.0f;
+constexpr int32_t kDurationPanelWidth        = 70;
+constexpr int32_t kDurationPanelHeight       = 18;
+constexpr int32_t kDurationPanelX            = 0;
+constexpr int32_t kDurationPanelY            = 38;
+constexpr int32_t kDurationPanelHiddenWidth  = 18;
+constexpr int32_t kDurationPanelHiddenY      = 64;
+constexpr int32_t kPausedLabelX              = 0;
+constexpr int32_t kPausedLabelY              = 14;
+constexpr float kPausedLabelFadeDuration     = 0.3f;
 
 }  // namespace
+
+class RecordingWaveformViewBase {
+public:
+    virtual ~RecordingWaveformViewBase() = default;
+
+    virtual void setFrame(const AudioFrame& frame) = 0;
+    virtual void tick(uint32_t nowMs)              = 0;
+};
+
+class IosWaveformView : public RecordingWaveformViewBase {
+public:
+    explicit IosWaveformView(lv_obj_t* parent)
+        : _panel(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent))
+    {
+        _panel->setSize(kWaveformPanelWidth, kWaveformPanelHeight);
+        _panel->align(LV_ALIGN_CENTER, kWaveformPanelX, kWaveformPanelY);
+        _panel->setBgOpa(LV_OPA_TRANSP);
+        _panel->setBorderWidth(0);
+        _panel->setShadowWidth(0);
+        _panel->setPaddingAll(0);
+        _panel->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+        _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _panel->addEventCb(onDraw, LV_EVENT_DRAW_MAIN, this);
+
+        for (size_t i = 0; i < kWaveformBarCount; ++i) {
+            _bars.push(0.0f);
+        }
+    }
+
+    void setFrame(const AudioFrame& frame) override
+    {
+        float amp = frame.amp;
+        if (!frame.samples.empty()) {
+            float sample_sum = 0.0f;
+            for (float sample : frame.samples) {
+                sample_sum += std::abs(sample * 2.0f - 1.0f);
+            }
+            amp = std::max(amp, sample_sum / static_cast<float>(frame.samples.size()));
+        }
+        _target_amp = std::max(_target_amp, std::clamp(amp, 0.0f, 1.0f));
+    }
+
+    void tick(uint32_t nowMs) override
+    {
+        updateAmp(nowMs);
+
+        if (_last_sample_ms == 0) {
+            _last_sample_ms = nowMs;
+        }
+
+        while (nowMs - _last_sample_ms >= kWaveformSampleIntervalMs) {
+            _bars.push(toVisualAmp(_display_amp));
+            _last_sample_ms += kWaveformSampleIntervalMs;
+        }
+
+        lv_obj_invalidate(_panel->raw_ptr());
+    }
+
+private:
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
+    smooth_ui_toolkit::RingBuffer<float, kWaveformBarCount> _bars;
+    float _target_amp        = 0.0f;
+    float _display_amp       = 0.0f;
+    uint32_t _last_tick_ms   = 0;
+    uint32_t _last_sample_ms = 0;
+
+    void updateAmp(uint32_t nowMs)
+    {
+        float dt = 0.0f;
+        if (_last_tick_ms != 0 && nowMs >= _last_tick_ms) {
+            dt = static_cast<float>(nowMs - _last_tick_ms) / 1000.0f;
+        }
+        _last_tick_ms = nowMs;
+
+        const float response = _target_amp >= _display_amp ? 0.42f : 0.16f;
+        _display_amp += (_target_amp - _display_amp) * response;
+        _target_amp *= std::pow(0.03f, dt);
+        if (_target_amp < 0.0005f) {
+            _target_amp = 0.0f;
+        }
+        if (_display_amp < 0.0005f) {
+            _display_amp = 0.0f;
+        }
+    }
+
+    static float toVisualAmp(float amp)
+    {
+        const float gained = std::clamp(amp * kWaveformGain, 0.0f, 1.0f);
+        return std::pow(gained, 0.68f);
+    }
+
+    void draw(lv_event_t* event)
+    {
+        lv_layer_t* layer = lv_event_get_layer(event);
+        if (!layer) {
+            return;
+        }
+
+        lv_area_t coords;
+        lv_obj_get_coords(_panel->raw_ptr(), &coords);
+
+        lv_draw_line_dsc_t line_dsc;
+        lv_draw_line_dsc_init(&line_dsc);
+        line_dsc.color = lv_color_hex(0xF0544D);
+        line_dsc.width = kWaveformBarWidth;
+        line_dsc.opa   = LV_OPA_COVER;
+
+        const int32_t mid_y = coords.y1 + kWaveformPanelHeight / 2;
+        const int32_t start_x =
+            coords.x1 + (kWaveformPanelWidth - ((kWaveformBarCount - 1) * kWaveformBarPitch + 1)) / 2;
+        size_t index = 0;
+        _bars.peekAll([&](const float& value, bool& stopPeeking) {
+            (void)stopPeeking;
+
+            int32_t bar_h = kWaveformMinBarHeight +
+                            static_cast<int32_t>(std::round(value * (kWaveformMaxBarHeight - kWaveformMinBarHeight)));
+            bar_h         = std::clamp(bar_h, kWaveformMinBarHeight, kWaveformMaxBarHeight);
+
+            const int32_t x    = start_x + static_cast<int32_t>(index) * kWaveformBarPitch;
+            const int32_t half = bar_h / 2;
+            line_dsc.p1.x      = x;
+            line_dsc.p1.y      = mid_y - half;
+            line_dsc.p2.x      = x;
+            line_dsc.p2.y      = mid_y + half;
+            lv_draw_line(layer, &line_dsc);
+            ++index;
+        });
+    }
+
+    static void onDraw(lv_event_t* event)
+    {
+        auto* self = static_cast<IosWaveformView*>(lv_event_get_user_data(event));
+        if (self) {
+            self->draw(event);
+        }
+    }
+};
 
 class RecordingView::DurationPanel {
 public:
@@ -217,16 +368,22 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _root->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
+    _waveform       = std::make_unique<IosWaveformView>(_root->raw_ptr());
     _duration_panel = std::make_unique<DurationPanel>(_root->raw_ptr());
     _paused_label   = std::make_unique<PausedLabel>(_root->raw_ptr());
 
     _key_bar             = std::make_unique<BottomKeyBar>(_root->raw_ptr());
     _state_observer_id   = _view_model.state().observe(this, onStateChanged);
     _elapsed_observer_id = _view_model.elapsedSec().observe(this, onElapsedChanged);
+    _frame_observer_id   = _view_model.frame().observe(this, onFrameChanged);
 }
 
 void RecordingView::onExit()
 {
+    if (_frame_observer_id != 0) {
+        _view_model.frame().removeObserver(_frame_observer_id);
+        _frame_observer_id = 0;
+    }
     if (_elapsed_observer_id != 0) {
         _view_model.elapsedSec().removeObserver(_elapsed_observer_id);
         _elapsed_observer_id = 0;
@@ -239,6 +396,7 @@ void RecordingView::onExit()
     _key_bar.reset();
     _paused_label.reset();
     _duration_panel.reset();
+    _waveform.reset();
     _root.reset();
 }
 
@@ -251,6 +409,9 @@ void RecordingView::tick(uint32_t nowMs)
     }
     if (_paused_label) {
         _paused_label->tick();
+    }
+    if (_waveform) {
+        _waveform->tick(nowMs);
     }
     if (_key_bar) {
         _key_bar->tick();
@@ -312,6 +473,13 @@ void RecordingView::renderElapsed(uint32_t elapsed_sec)
     }
 }
 
+void RecordingView::renderFrame(const AudioFrame& frame)
+{
+    if (_waveform) {
+        _waveform->setFrame(frame);
+    }
+}
+
 void RecordingView::onStateChanged(void* context, const RecordingState& state)
 {
     auto* self = static_cast<RecordingView*>(context);
@@ -325,6 +493,14 @@ void RecordingView::onElapsedChanged(void* context, const uint32_t& elapsed_sec)
     auto* self = static_cast<RecordingView*>(context);
     if (self) {
         self->renderElapsed(elapsed_sec);
+    }
+}
+
+void RecordingView::onFrameChanged(void* context, const AudioFrame& frame)
+{
+    auto* self = static_cast<RecordingView*>(context);
+    if (self) {
+        self->renderFrame(frame);
     }
 }
 
