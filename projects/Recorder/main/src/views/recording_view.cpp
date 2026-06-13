@@ -33,6 +33,8 @@ constexpr size_t kWaveformBarCount               = 86;
 constexpr size_t kWaveformEdgeFadeBarCount       = 3;
 constexpr size_t kLineWaveformPointCount         = 128;
 constexpr float kLineWaveformGain                = 8.0f;
+constexpr uint32_t kBasicWaveformFrameIntervalMs = 33;
+constexpr uint32_t kLineWaveformFrameIntervalMs  = 33;
 constexpr uint32_t kWaveformHistoryMs            = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs     = kWaveformHistoryMs / kWaveformBarCount;
 constexpr uint32_t kLineWaveformSampleIntervalMs = kWaveformHistoryMs / kLineWaveformPointCount;
@@ -59,6 +61,7 @@ constexpr uint8_t kPrismCanvasAlpha              = 255;
 constexpr int32_t kPrismEdgeFadeWidth            = 12;
 constexpr uint32_t kPrismCurveMinLifetimeMs      = 500;
 constexpr uint32_t kPrismCurveMaxLifetimeMs      = 1000;
+constexpr uint32_t kPrismWaveformFrameIntervalMs = 40;
 constexpr int32_t kDurationPanelWidth            = 70;
 constexpr int32_t kDurationPanelHeight           = 18;
 constexpr int32_t kDurationPanelX                = 0;
@@ -125,8 +128,26 @@ protected:
         return static_cast<lv_opa_t>((LV_OPA_COVER * fade_step) / (kWaveformEdgeFadeBarCount + 1));
     }
 
+    bool shouldRender(uint32_t nowMs, uint32_t intervalMs)
+    {
+        if (!_has_render_tick) {
+            _has_render_tick = true;
+            _last_render_ms  = nowMs;
+            return true;
+        }
+
+        if (nowMs - _last_render_ms < intervalMs) {
+            return false;
+        }
+
+        _last_render_ms = nowMs;
+        return true;
+    }
+
 private:
     smooth_ui_toolkit::color::AnimateRgb_t _color;
+    uint32_t _last_render_ms = 0;
+    bool _has_render_tick    = false;
 };
 
 class BasicWaveformView : public RecordingWaveformViewBase {
@@ -155,6 +176,10 @@ public:
 
     void tick(uint32_t nowMs) override
     {
+        if (!shouldRender(nowMs, kBasicWaveformFrameIntervalMs)) {
+            return;
+        }
+
         updateAmp(nowMs);
 
         if (_last_sample_ms == 0) {
@@ -270,6 +295,10 @@ public:
 
     void tick(uint32_t nowMs) override
     {
+        if (!shouldRender(nowMs, kLineWaveformFrameIntervalMs)) {
+            return;
+        }
+
         if (_last_sample_ms == 0) {
             _last_sample_ms = nowMs;
         }
@@ -386,6 +415,10 @@ public:
 
     void tick(uint32_t nowMs) override
     {
+        if (!shouldRender(nowMs, kPrismWaveformFrameIntervalMs)) {
+            return;
+        }
+
         float dt = 0.0f;
         if (_last_tick_ms != 0 && nowMs >= _last_tick_ms) {
             dt = static_cast<float>(nowMs - _last_tick_ms) / 1000.0f;
