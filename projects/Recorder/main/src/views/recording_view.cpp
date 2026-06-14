@@ -88,16 +88,13 @@ constexpr int32_t kFileDialogRadius              = 14;
 constexpr int32_t kFileNameAreaWidth             = 238;
 constexpr int32_t kFileNameAreaHeight            = 28;
 constexpr int32_t kFileNameAreaRadius            = 5;
-constexpr int32_t kFileButtonWidth               = 96;
 constexpr int32_t kFileButtonHeight              = 23;
 constexpr int32_t kFileButtonRadius              = 5;
 constexpr int32_t kFilePromptCenterX             = 0;
-constexpr int32_t kFilePromptCenterY             = -32;
+constexpr int32_t kFilePromptCenterY             = -34;
 constexpr int32_t kFileNameAreaCenterX           = 0;
-constexpr int32_t kFileNameAreaCenterY           = -5;
-constexpr int32_t kFileButtonCenterY             = 28;
-constexpr int32_t kFileDiscardButtonCenterX      = -33;
-constexpr int32_t kFileConfirmButtonCenterX      = 71;
+constexpr int32_t kFileNameAreaCenterY           = -7;
+constexpr int32_t kFileButtonCenterY             = 26;
 constexpr int32_t kFileDialogOpenOriginX         = 0;
 constexpr int32_t kFileDialogOpenOriginY         = -150;
 constexpr int32_t kFileDialogOpenOriginWidth     = 180;
@@ -969,9 +966,9 @@ public:
 
         setupPrompt();
         setupInput();
-        setupButton(*_discard_button, *_discard_label, kFileDiscardButtonCenterX, "ESC: Discard",
-                    lv_color_hex(0xC33630), lv_color_hex(0xFFECEC), onDiscardClicked);
-        setupButton(*_confirm_button, *_confirm_label, kFileConfirmButtonCenterX, "Enter: OK", lv_color_hex(0xFED40D),
+        setupButton(*_discard_button, *_discard_label, -31, 110, "ESC: Discard", lv_color_hex(0xC33630),
+                    lv_color_hex(0xFFECEC), onDiscardClicked);
+        setupButton(*_confirm_button, *_confirm_label, 75, 87, "Enter: OK", lv_color_hex(0xFED40D),
                     lv_color_hex(0x5E4D00), onConfirmClicked);
     }
 
@@ -1130,9 +1127,10 @@ private:
     }
 
     void setupButton(smooth_ui_toolkit::lvgl_cpp::Container& button, smooth_ui_toolkit::lvgl_cpp::Label& label,
-                     int32_t x, const char* text, lv_color_t bg_color, lv_color_t label_color, lv_event_cb_t callback)
+                     int32_t x, int32_t width, const char* text, lv_color_t bg_color, lv_color_t label_color,
+                     lv_event_cb_t callback)
     {
-        button.setSize(kFileButtonWidth, kFileButtonHeight);
+        button.setSize(width, kFileButtonHeight);
         button.align(LV_ALIGN_CENTER, x, kFileButtonCenterY);
         button.setBgColor(bg_color);
         button.setBgOpa(LV_OPA_COVER);
