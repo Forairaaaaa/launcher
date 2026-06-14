@@ -44,8 +44,9 @@ RecorderApp::RecorderApp()
       _playback_vm(_router, _playback_model),
       _recording_view(_recording_vm),
       _recording_files_view(_files_vm),
+      _playback_view(_playback_vm),
       _view_models{&_recording_vm, &_files_vm, &_playback_vm},
-      _views{&_recording_view, &_recording_files_view, nullptr}
+      _views{&_recording_view, &_recording_files_view, &_playback_view}
 {
 }
 
