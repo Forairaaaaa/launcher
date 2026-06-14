@@ -126,7 +126,7 @@ public:
           _scroll_thumb(std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr()))
     {
         _panel->setSize(kMenuWidth, kMenuHeight);
-        _panel->align(LV_ALIGN_TOP_MID, 0, 0);
+        _panel->align(LV_ALIGN_TOP_MID, 0, 6);
         _panel->setBgOpa(LV_OPA_TRANSP);
         _panel->setBorderWidth(0);
         _panel->setShadowWidth(0);
@@ -426,8 +426,8 @@ public:
         setupNameArea();
         setupButton(*_cancel_button, *_cancel_label, -46, 102, "ESC: Cancel", lv_color_hex(0x6D6D6D),
                     lv_color_hex(0xF3F3F3), onCancelClicked);
-        setupButton(*_confirm_button, *_confirm_label, 67, 106, "Enter: Delete", lv_color_hex(0xE3433C),
-                    lv_color_hex(0xFFEDED), onConfirmClicked);
+        setupButton(*_confirm_button, *_confirm_label, 67, 106, "Enter: Delete", lv_color_hex(0xC33630),
+                    lv_color_hex(0xFFECEC), onConfirmClicked);
     }
 
     void setPending(const PendingDeleteRecordingFile& pending)
@@ -639,15 +639,6 @@ void RecordingFilesView::onEnter(lv_obj_t* parent)
     _menu                  = std::make_unique<RecordingFilesMenu>(_root->raw_ptr());
     _delete_confirm_dialog = std::make_unique<DeleteConfirmDialog>(_root->raw_ptr(), _view_model);
 
-    _divider = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_root->raw_ptr());
-    _divider->setSize(kDividerWidth, kDividerHeight);
-    _divider->setPos(kDividerX, kDividerY);
-    _divider->setBgColor(lv_color_hex(kDividerColor));
-    _divider->setBgOpa(LV_OPA_COVER);
-    _divider->setBorderWidth(0);
-    _divider->setRadius(0);
-    _divider->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
-
     _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
     _key_bar->setItems({
         {'4', &image_icon_nav_back},
@@ -679,7 +670,6 @@ void RecordingFilesView::onExit()
     }
 
     _key_bar.reset();
-    _divider.reset();
     _delete_confirm_dialog.reset();
     _menu.reset();
     _root.reset();

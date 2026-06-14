@@ -31,7 +31,6 @@ private:
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _root;
     std::unique_ptr<RecordingFilesMenu> _menu;
     std::unique_ptr<DeleteConfirmDialog> _delete_confirm_dialog;
-    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _divider;
     std::unique_ptr<BottomKeyBar> _key_bar;
     size_t _files_observer_id          = 0;
     size_t _selected_index_observer_id = 0;
