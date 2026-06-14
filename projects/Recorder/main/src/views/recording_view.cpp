@@ -106,6 +106,12 @@ constexpr float kFileDialogOpenMoveDuration      = 0.42f;
 constexpr float kFileDialogOpenSizeDuration      = 0.34f;
 constexpr float kFileDialogCloseMoveDuration     = 0.44f;
 constexpr float kFileDialogCloseSizeDuration     = 0.30f;
+constexpr float kRootFadeDuration                = 0.18f;
+
+lv_opa_t fadeMaskOpacityFromFloat(float value)
+{
+    return static_cast<lv_opa_t>(std::clamp(static_cast<int>(std::round(value)), 0, 255));
+}
 
 }  // namespace
 
@@ -1341,6 +1347,20 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _file_confirm_dialog = std::make_unique<FileConfirmDialog>(_root->raw_ptr(), _view_model);
     _paused_label        = std::make_unique<PausedLabel>(_root->raw_ptr());
 
+    _fade_mask = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_root->raw_ptr());
+    _fade_mask->setSize(lv_pct(100), lv_pct(100));
+    _fade_mask->setBgColor(lv_color_hex(0x000000));
+    _fade_mask->setBgOpa(LV_OPA_COVER);
+    _fade_mask->setBorderWidth(0);
+    _fade_mask->setPaddingAll(0);
+    _fade_mask->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+    _fade_mask->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _fade_mask_opacity.easingOptions().duration       = kRootFadeDuration;
+    _fade_mask_opacity.easingOptions().easingFunction = smooth_ui_toolkit::ease::ease_out_quad;
+    _fade_mask_opacity.teleport(255);
+    _fade_mask_opacity.move(0);
+
     _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
     _view_model.state().observe(this, onStateChanged);
     _view_model.elapsedSec().observe(this, onElapsedChanged);
@@ -1364,6 +1384,7 @@ void RecordingView::onExit()
     _file_confirm_dialog.reset();
     _duration_panel.reset();
     _waveform.reset();
+    _fade_mask.reset();
     _root.reset();
 }
 
@@ -1371,6 +1392,13 @@ void RecordingView::tick(uint32_t nowMs)
 {
     (void)nowMs;
 
+    if (_fade_mask) {
+        _fade_mask_opacity.update();
+        _fade_mask->setBgOpa(fadeMaskOpacityFromFloat(_fade_mask_opacity.directValue()));
+        if (_fade_mask_opacity.done() && _fade_mask_opacity.directValue() <= 0.0f) {
+            _fade_mask->addFlag(LV_OBJ_FLAG_HIDDEN);
+        }
+    }
     if (_duration_panel) {
         _duration_panel->tick();
     }

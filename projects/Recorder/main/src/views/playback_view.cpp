@@ -1,5 +1,6 @@
 #include "views/playback_view.hpp"
 #include "assets/assets.h"
+#include <core/animation/animate_value/animate_value.hpp>
 #include <core/color/color.hpp>
 #include <core/easing/ease.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
@@ -48,6 +49,12 @@ constexpr uint32_t kProgressFillColor      = 0xDDDDDD;
 constexpr int32_t kTimeLabelY              = 117;
 constexpr int32_t kTimeLabelWidth          = 96;
 constexpr uint32_t kTimeTextColor          = 0x777777;
+constexpr float kRootFadeDuration          = 0.18f;
+
+lv_opa_t fadeMaskOpacityFromFloat(float value)
+{
+    return static_cast<lv_opa_t>(std::clamp(static_cast<int>(std::round(value)), 0, 255));
+}
 
 std::string fileTitle(const RecordingFile& file)
 {
@@ -381,6 +388,20 @@ void PlaybackView::onEnter(lv_obj_t* parent)
     _remaining_label->setSize(kTimeLabelWidth, LV_SIZE_CONTENT);
     _remaining_label->setPos(kProgressBarX + kProgressBarWidth - kTimeLabelWidth, kTimeLabelY);
 
+    _fade_mask = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_root->raw_ptr());
+    _fade_mask->setSize(lv_pct(100), lv_pct(100));
+    _fade_mask->setBgColor(lv_color_hex(0x000000));
+    _fade_mask->setBgOpa(LV_OPA_COVER);
+    _fade_mask->setBorderWidth(0);
+    _fade_mask->setPaddingAll(0);
+    _fade_mask->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
+    _fade_mask->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+    _fade_mask_opacity.easingOptions().duration       = kRootFadeDuration;
+    _fade_mask_opacity.easingOptions().easingFunction = smooth_ui_toolkit::ease::ease_out_quad;
+    _fade_mask_opacity.teleport(255);
+    _fade_mask_opacity.move(0);
+
     _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
 
     _view_model.state().observe(this, onStateChanged);
@@ -403,6 +424,7 @@ void PlaybackView::onExit()
     _playhead.reset();
     _waveform.reset();
     _title_label.reset();
+    _fade_mask.reset();
     _root.reset();
 }
 
@@ -410,6 +432,13 @@ void PlaybackView::tick(uint32_t nowMs)
 {
     (void)nowMs;
 
+    if (_fade_mask) {
+        _fade_mask_opacity.update();
+        _fade_mask->setBgOpa(fadeMaskOpacityFromFloat(_fade_mask_opacity.directValue()));
+        if (_fade_mask_opacity.done() && _fade_mask_opacity.directValue() <= 0.0f) {
+            _fade_mask->addFlag(LV_OBJ_FLAG_HIDDEN);
+        }
+    }
     if (_waveform) {
         _waveform->tick();
     }

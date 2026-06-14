@@ -3,6 +3,7 @@
 #include "view_models/playback_view_model.hpp"
 #include "views/bottom_key_bar.hpp"
 #include "views/view.hpp"
+#include <core/animation/animate_value/animate_value.hpp>
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/lvgl_cpp/obj.hpp>
 #include <memory>
@@ -27,6 +28,8 @@ private:
 
     PlaybackViewModel& _view_model;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _root;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _fade_mask;
+    smooth_ui_toolkit::AnimateValue _fade_mask_opacity;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _title_label;
     std::unique_ptr<WaveformView> _waveform;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _playhead;
