@@ -3,12 +3,14 @@
 #include "core/recorder_types.hpp"
 #include <tools/observable/single_observable.hpp>
 #include <memory>
+#include <string>
 
 namespace recorder {
 
 class RecordingModel {
 public:
     RecordingModel();
+    explicit RecordingModel(std::string recordings_dir);
     ~RecordingModel();
 
     smooth_ui_toolkit::SingleObservable<RecordingState>& state()

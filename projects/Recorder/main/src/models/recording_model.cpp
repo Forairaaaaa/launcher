@@ -1,4 +1,5 @@
 #include "models/recording_model.hpp"
+#include "core/recorder_config.hpp"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
@@ -9,15 +10,15 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-#include <ctime>
 #include <cerrno>
+#include <ctime>
 #include <iomanip>
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 #include <spdlog/spdlog.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
 namespace recorder {
@@ -36,20 +37,8 @@ constexpr float kPi                    = 3.14159265358979323846f;
 constexpr auto kStartCooldown          = std::chrono::milliseconds(300);
 constexpr auto kMonitorRetryInterval   = std::chrono::milliseconds(2000);
 
-std::string makeRecordingPath()
+std::string makeRecordingPath(const std::string& dir)
 {
-    char cwd[512] = {};
-    if (getcwd(cwd, sizeof(cwd)) == nullptr) {
-        spdlog::warn("RecordingModel: getcwd failed, fallback to current directory");
-        std::snprintf(cwd, sizeof(cwd), ".");
-    }
-
-    std::string dir = std::string(cwd) + "/recordings";
-    if (mkdir(dir.c_str(), 0755) != 0 && errno != EEXIST) {
-        spdlog::warn("RecordingModel: failed to create {}, errno={}", dir, errno);
-        dir = cwd;
-    }
-
     auto now             = std::chrono::system_clock::now();
     std::time_t now_time = std::chrono::system_clock::to_time_t(now);
     std::tm tm{};
@@ -208,6 +197,11 @@ void fillSpectrum(AudioFrame& frame, const float* samples, ma_uint32 frame_count
 }  // namespace
 
 struct RecordingModel::Impl {
+    explicit Impl(std::string dir) : recordings_dir(normalizeRecordingDirectory(dir))
+    {
+    }
+
+    std::string recordings_dir;
     ma_context context{};
     ma_device device{};
     ma_encoder encoder{};
@@ -259,7 +253,12 @@ struct RecordingModel::Impl {
             return false;
         }
 
-        current_path = makeRecordingPath();
+        if (!ensureDirectoryExists(recordings_dir, "RecordingModel")) {
+            spdlog::error("RecordingModel: start recording failed, recordingsDir={}", recordings_dir);
+            return false;
+        }
+
+        current_path = makeRecordingPath(recordings_dir);
         captured_frames.store(0);
 
         ma_encoder_config encoder_config =
@@ -574,8 +573,13 @@ struct RecordingModel::Impl {
     }
 };
 
-RecordingModel::RecordingModel() : _impl(std::make_unique<Impl>())
+RecordingModel::RecordingModel() : RecordingModel(defaultRecordingsDirectory())
 {
+}
+
+RecordingModel::RecordingModel(std::string recordings_dir) : _impl(std::make_unique<Impl>(std::move(recordings_dir)))
+{
+    spdlog::info("RecordingModel: recordingsDir={}", _impl->recordings_dir);
     _impl->ensureMonitor();
 }
 

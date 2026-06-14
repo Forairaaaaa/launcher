@@ -2,6 +2,7 @@
 #include "hal_lvgl_bsp.h"
 #include <lvgl.h>
 #include <spdlog/spdlog.h>
+#include <utility>
 
 namespace recorder {
 
@@ -38,8 +39,11 @@ bool textInputFocused()
 
 }  // namespace
 
-RecorderApp::RecorderApp()
-    : _recording_vm(_router, _recording_model),
+RecorderApp::RecorderApp(RecorderConfig config)
+    : _config(std::move(config)),
+      _recording_model(_config.recordings_dir),
+      _files_model(_config.recordings_dir),
+      _recording_vm(_router, _recording_model),
       _files_vm(_router, _files_model, _playback_model),
       _playback_vm(_router, _playback_model),
       _recording_view(_recording_vm),
@@ -63,6 +67,7 @@ RecorderApp::~RecorderApp()
 
 void RecorderApp::start()
 {
+    spdlog::info("RecorderApp: recordingsDir={}", _config.recordings_dir);
     lv_obj_set_style_bg_color(lv_screen_active(), lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(lv_screen_active(), LV_OPA_COVER, LV_PART_MAIN);
     setupInputGroup();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/recorder_config.hpp"
 #include "models/playback_model.hpp"
 #include "models/recording_files_model.hpp"
 #include "models/recording_model.hpp"
@@ -12,12 +13,13 @@
 #include "views/view.hpp"
 #include <lvgl.h>
 #include <array>
+#include <utility>
 
 namespace recorder {
 
 class RecorderApp {
 public:
-    RecorderApp();
+    explicit RecorderApp(RecorderConfig config = defaultRecorderConfig());
     ~RecorderApp();
 
     RecorderApp(const RecorderApp&)            = delete;
@@ -33,6 +35,7 @@ public:
     }
 
 private:
+    RecorderConfig _config;
     RecorderRouter _router;
     RecordingModel _recording_model;
     RecordingFilesModel _files_model;

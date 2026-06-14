@@ -1,4 +1,5 @@
 #include "models/recording_files_model.hpp"
+#include "core/recorder_config.hpp"
 #include <miniaudio.h>
 #include <spdlog/spdlog.h>
 #include <algorithm>
@@ -7,28 +8,13 @@
 #include <cmath>
 #include <cstdio>
 #include <dirent.h>
+#include <utility>
 #include <string>
 #include <sys/stat.h>
-#include <unistd.h>
 
 namespace recorder {
 
 namespace {
-
-std::string recordingsDirectory()
-{
-    char cwd[512] = {};
-    if (getcwd(cwd, sizeof(cwd)) == nullptr) {
-        spdlog::warn("RecordingFilesModel: getcwd failed, fallback to current directory");
-        std::snprintf(cwd, sizeof(cwd), ".");
-    }
-
-    std::string dir = std::string(cwd) + "/recordings";
-    if (mkdir(dir.c_str(), 0755) != 0 && errno != EEXIST) {
-        spdlog::warn("RecordingFilesModel: failed to create {}, errno={}", dir, errno);
-    }
-    return dir;
-}
 
 bool hasWavExtension(const std::string& name)
 {
@@ -66,6 +52,16 @@ uint32_t wavDurationSec(const std::string& path)
 
 }  // namespace
 
+RecordingFilesModel::RecordingFilesModel() : RecordingFilesModel(defaultRecordingsDirectory())
+{
+}
+
+RecordingFilesModel::RecordingFilesModel(std::string recordings_dir)
+    : _recordings_dir(normalizeRecordingDirectory(recordings_dir))
+{
+    spdlog::info("RecordingFilesModel: recordingsDir={}", _recordings_dir);
+}
+
 const RecordingFile* RecordingFilesModel::selectedFile() const
 {
     const auto& list = _files.get();
@@ -80,7 +76,7 @@ void RecordingFilesModel::refresh(bool preserveSelected)
 {
     const RecordingFile* selected   = preserveSelected ? selectedFile() : nullptr;
     const std::string selected_path = selected ? selected->path : "";
-    const std::string dir           = recordingsDirectory();
+    const std::string& dir          = _recordings_dir;
 
     struct Entry {
         RecordingFile file;
@@ -88,6 +84,12 @@ void RecordingFilesModel::refresh(bool preserveSelected)
     };
 
     std::vector<Entry> entries;
+    if (!ensureDirectoryExists(dir, "RecordingFilesModel")) {
+        _files.set(std::vector<RecordingFile>{});
+        _selected_index.set(-1);
+        return;
+    }
+
     DIR* handle = opendir(dir.c_str());
     if (!handle) {
         spdlog::warn("RecordingFilesModel: failed to open recordings directory {}, errno={}", dir, errno);
