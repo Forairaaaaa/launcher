@@ -94,7 +94,7 @@ constexpr int32_t kFileButtonRadius              = 5;
 constexpr int32_t kFilePromptCenterX             = 0;
 constexpr int32_t kFilePromptCenterY             = -32;
 constexpr int32_t kFileNameAreaCenterX           = 0;
-constexpr int32_t kFileNameAreaCenterY           = -2;
+constexpr int32_t kFileNameAreaCenterY           = -5;
 constexpr int32_t kFileButtonCenterY             = 28;
 constexpr int32_t kFileDiscardButtonCenterX      = -33;
 constexpr int32_t kFileConfirmButtonCenterX      = 71;
@@ -970,9 +970,9 @@ public:
         setupPrompt();
         setupInput();
         setupButton(*_discard_button, *_discard_label, kFileDiscardButtonCenterX, "ESC: Discard",
-                    lv_color_hex(0xE3433C), onDiscardClicked);
-        setupButton(*_confirm_button, *_confirm_label, kFileConfirmButtonCenterX, "Enter: OK", lv_color_hex(0x48C064),
-                    onConfirmClicked);
+                    lv_color_hex(0xC33630), lv_color_hex(0xFFECEC), onDiscardClicked);
+        setupButton(*_confirm_button, *_confirm_label, kFileConfirmButtonCenterX, "Enter: OK", lv_color_hex(0xFED40D),
+                    lv_color_hex(0x5E4D00), onConfirmClicked);
     }
 
     ~FileConfirmDialog()
@@ -1126,14 +1126,15 @@ private:
         _input->setOneLine(true);
         _input->setMaxLength(64);
         _input->addEventCb(onInputValueChanged, LV_EVENT_VALUE_CHANGED, this);
+        _input->setOutlineWidth(0, LV_STATE_FOCUSED | LV_STATE_FOCUS_KEY);
     }
 
     void setupButton(smooth_ui_toolkit::lvgl_cpp::Container& button, smooth_ui_toolkit::lvgl_cpp::Label& label,
-                     int32_t x, const char* text, lv_color_t color, lv_event_cb_t callback)
+                     int32_t x, const char* text, lv_color_t bg_color, lv_color_t label_color, lv_event_cb_t callback)
     {
         button.setSize(kFileButtonWidth, kFileButtonHeight);
         button.align(LV_ALIGN_CENTER, x, kFileButtonCenterY);
-        button.setBgColor(color);
+        button.setBgColor(bg_color);
         button.setBgOpa(LV_OPA_COVER);
         button.setRadius(kFileButtonRadius);
         button.setBorderWidth(0);
@@ -1145,7 +1146,7 @@ private:
 
         label.setText(text);
         label.setTextFont(&font_chivo_medium_14);
-        label.setTextColor(lv_color_hex(0xFFFFFF));
+        label.setTextColor(label_color);
         label.setTextAlign(LV_TEXT_ALIGN_CENTER);
         label.center();
     }
