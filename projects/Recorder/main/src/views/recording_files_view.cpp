@@ -48,7 +48,6 @@ constexpr int32_t kDeleteDialogRadius     = 14;
 constexpr int32_t kDeleteNameAreaWidth    = 238;
 constexpr int32_t kDeleteNameAreaHeight   = 28;
 constexpr int32_t kDeleteNameAreaRadius   = 5;
-constexpr int32_t kDeleteButtonWidth      = 96;
 constexpr int32_t kDeleteButtonHeight     = 23;
 constexpr int32_t kDeleteButtonRadius     = 5;
 constexpr int32_t kDeletePromptCenterX    = 0;
@@ -56,8 +55,6 @@ constexpr int32_t kDeletePromptCenterY    = -32;
 constexpr int32_t kDeleteNameAreaCenterX  = 0;
 constexpr int32_t kDeleteNameAreaCenterY  = -5;
 constexpr int32_t kDeleteButtonCenterY    = 28;
-constexpr int32_t kDeleteCancelButtonX    = -33;
-constexpr int32_t kDeleteConfirmButtonX   = 71;
 constexpr int32_t kDeleteOpenOriginX      = 0;
 constexpr int32_t kDeleteOpenOriginY      = -150;
 constexpr int32_t kDeleteOpenOriginWidth  = 180;
@@ -415,7 +412,7 @@ public:
         configureOpenAnimation();
 
         applyAnimatedValue();
-        _panel->setBgColor(lv_color_hex(0x722B28));
+        _panel->setBgColor(lv_color_hex(0x474747));
         _panel->setBgOpa(LV_OPA_COVER);
         _panel->setRadius(kDeleteDialogRadius);
         _panel->setBorderWidth(0);
@@ -427,10 +424,10 @@ public:
 
         setupPrompt();
         setupNameArea();
-        setupButton(*_cancel_button, *_cancel_label, kDeleteCancelButtonX, "ESC: Cancel", lv_color_hex(0x94504D),
-                    onCancelClicked);
-        setupButton(*_confirm_button, *_confirm_label, kDeleteConfirmButtonX, "Enter: Delete", lv_color_hex(0xE3433C),
-                    onConfirmClicked);
+        setupButton(*_cancel_button, *_cancel_label, -46, 102, "ESC: Cancel", lv_color_hex(0x6D6D6D),
+                    lv_color_hex(0xF3F3F3), onCancelClicked);
+        setupButton(*_confirm_button, *_confirm_label, 67, 106, "Enter: Delete", lv_color_hex(0xE3433C),
+                    lv_color_hex(0xFFEDED), onConfirmClicked);
     }
 
     void setPending(const PendingDeleteRecordingFile& pending)
@@ -540,9 +537,9 @@ private:
     {
         _prompt_label->setText("Delete recording?");
         _prompt_label->setTextFont(&font_chivo_medium_14);
-        _prompt_label->setTextColor(lv_color_hex(0xD7ADAB));
+        _prompt_label->setTextColor(lv_color_hex(0xBCBCBC));
         _prompt_label->setTextAlign(LV_TEXT_ALIGN_LEFT);
-        _prompt_label->setSize(230, LV_SIZE_CONTENT);
+        _prompt_label->setSize(220, LV_SIZE_CONTENT);
         _prompt_label->align(LV_ALIGN_CENTER, kDeletePromptCenterX, kDeletePromptCenterY);
     }
 
@@ -557,11 +554,12 @@ private:
     }
 
     void setupButton(smooth_ui_toolkit::lvgl_cpp::Container& button, smooth_ui_toolkit::lvgl_cpp::Label& label,
-                     int32_t x, const char* text, lv_color_t color, lv_event_cb_t callback)
+                     int32_t x, int32_t width, const char* text, lv_color_t bg_color, lv_color_t label_color,
+                     lv_event_cb_t callback)
     {
-        button.setSize(kDeleteButtonWidth, kDeleteButtonHeight);
+        button.setSize(width, kDeleteButtonHeight);
         button.align(LV_ALIGN_CENTER, x, kDeleteButtonCenterY);
-        button.setBgColor(color);
+        button.setBgColor(bg_color);
         button.setBgOpa(LV_OPA_COVER);
         button.setRadius(kDeleteButtonRadius);
         button.setBorderWidth(0);
@@ -573,7 +571,7 @@ private:
 
         label.setText(text);
         label.setTextFont(&font_chivo_medium_14);
-        label.setTextColor(lv_color_hex(0xFFFFFF));
+        label.setTextColor(label_color);
         label.setTextAlign(LV_TEXT_ALIGN_CENTER);
         label.center();
     }
