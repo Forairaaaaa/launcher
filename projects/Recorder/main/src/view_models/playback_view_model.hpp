@@ -19,22 +19,22 @@ public:
     void onKey(uint32_t key) override;
     void tick(uint32_t nowMs) override;
 
-    smooth_ui_toolkit::Observable<PlaybackState>& state()
+    smooth_ui_toolkit::SingleObservable<PlaybackState>& state()
     {
         return _model.state();
     }
 
-    smooth_ui_toolkit::Observable<RecordingFile>& file()
+    smooth_ui_toolkit::SingleObservable<RecordingFile>& file()
     {
         return _model.file();
     }
 
-    smooth_ui_toolkit::Observable<float>& progressSec()
+    smooth_ui_toolkit::SingleObservable<float>& progressSec()
     {
         return _model.progressSec();
     }
 
-    smooth_ui_toolkit::Observable<float>& speed()
+    smooth_ui_toolkit::SingleObservable<float>& speed()
     {
         return _model.speed();
     }

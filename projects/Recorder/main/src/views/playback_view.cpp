@@ -383,30 +383,18 @@ void PlaybackView::onEnter(lv_obj_t* parent)
 
     _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
 
-    _state_observer_id    = _view_model.state().observe(this, onStateChanged);
-    _file_observer_id     = _view_model.file().observe(this, onFileChanged);
-    _progress_observer_id = _view_model.progressSec().observe(this, onProgressChanged);
-    _speed_observer_id    = _view_model.speed().observe(this, onSpeedChanged);
+    _view_model.state().observe(this, onStateChanged);
+    _view_model.file().observe(this, onFileChanged);
+    _view_model.progressSec().observe(this, onProgressChanged);
+    _view_model.speed().observe(this, onSpeedChanged);
 }
 
 void PlaybackView::onExit()
 {
-    if (_speed_observer_id != 0) {
-        _view_model.speed().removeObserver(_speed_observer_id);
-        _speed_observer_id = 0;
-    }
-    if (_progress_observer_id != 0) {
-        _view_model.progressSec().removeObserver(_progress_observer_id);
-        _progress_observer_id = 0;
-    }
-    if (_file_observer_id != 0) {
-        _view_model.file().removeObserver(_file_observer_id);
-        _file_observer_id = 0;
-    }
-    if (_state_observer_id != 0) {
-        _view_model.state().removeObserver(_state_observer_id);
-        _state_observer_id = 0;
-    }
+    _view_model.speed().removeObserver();
+    _view_model.progressSec().removeObserver();
+    _view_model.file().removeObserver();
+    _view_model.state().removeObserver();
 
     _key_bar.reset();
     _remaining_label.reset();

@@ -648,26 +648,16 @@ void RecordingFilesView::onEnter(lv_obj_t* parent)
         {'8', &image_icon_delete},
     });
 
-    _files_observer_id          = _view_model.files().observe(this, onFilesChanged);
-    _selected_index_observer_id = _view_model.selectedIndex().observe(this, onSelectedIndexChanged);
+    _view_model.files().observe(this, onFilesChanged);
+    _view_model.selectedIndex().observe(this, onSelectedIndexChanged);
     _view_model.pendingDeleteRecording().observe(this, onPendingDeleteRecordingChanged);
-    _pending_delete_observing = true;
 }
 
 void RecordingFilesView::onExit()
 {
-    if (_pending_delete_observing) {
-        _view_model.pendingDeleteRecording().removeObserver();
-        _pending_delete_observing = false;
-    }
-    if (_selected_index_observer_id != 0) {
-        _view_model.selectedIndex().removeObserver(_selected_index_observer_id);
-        _selected_index_observer_id = 0;
-    }
-    if (_files_observer_id != 0) {
-        _view_model.files().removeObserver(_files_observer_id);
-        _files_observer_id = 0;
-    }
+    _view_model.pendingDeleteRecording().removeObserver();
+    _view_model.selectedIndex().removeObserver();
+    _view_model.files().removeObserver();
 
     _key_bar.reset();
     _delete_confirm_dialog.reset();

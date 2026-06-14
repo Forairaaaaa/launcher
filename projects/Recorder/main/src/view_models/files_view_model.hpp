@@ -30,12 +30,12 @@ public:
     void onEnter() override;
     void onKey(uint32_t key) override;
 
-    smooth_ui_toolkit::Observable<std::vector<RecordingFile>>& files()
+    smooth_ui_toolkit::SingleObservable<std::vector<RecordingFile>>& files()
     {
         return _files_model.files();
     }
 
-    smooth_ui_toolkit::Observable<int>& selectedIndex()
+    smooth_ui_toolkit::SingleObservable<int>& selectedIndex()
     {
         return _files_model.selectedIndex();
     }

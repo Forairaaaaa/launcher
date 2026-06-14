@@ -5,7 +5,6 @@
 #include "views/view.hpp"
 #include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/lvgl_cpp/obj.hpp>
-#include <cstddef>
 #include <memory>
 
 namespace recorder {
@@ -35,10 +34,6 @@ private:
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _elapsed_label;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _remaining_label;
     std::unique_ptr<BottomKeyBar> _key_bar;
-    size_t _state_observer_id    = 0;
-    size_t _file_observer_id     = 0;
-    size_t _progress_observer_id = 0;
-    size_t _speed_observer_id    = 0;
 
     void renderState(PlaybackState state);
     void renderFile(const RecordingFile& file);

@@ -4,7 +4,6 @@
 #include "views/bottom_key_bar.hpp"
 #include "views/view.hpp"
 #include <lvgl/lvgl_cpp/obj.hpp>
-#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -32,9 +31,6 @@ private:
     std::unique_ptr<RecordingFilesMenu> _menu;
     std::unique_ptr<DeleteConfirmDialog> _delete_confirm_dialog;
     std::unique_ptr<BottomKeyBar> _key_bar;
-    size_t _files_observer_id          = 0;
-    size_t _selected_index_observer_id = 0;
-    bool _pending_delete_observing     = false;
 
     void renderFiles(const std::vector<RecordingFile>& files);
     void renderSelectedIndex(int index);
