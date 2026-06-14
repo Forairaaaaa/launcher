@@ -15,6 +15,7 @@ public:
     }
 
     void onEnter() override;
+    void onExit() override;
     void onKey(uint32_t key) override;
     void tick(uint32_t nowMs) override;
 

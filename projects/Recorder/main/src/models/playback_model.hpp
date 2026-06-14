@@ -2,11 +2,15 @@
 
 #include "core/recorder_types.hpp"
 #include <tools/observable/observable.hpp>
+#include <memory>
 
 namespace recorder {
 
 class PlaybackModel {
 public:
+    PlaybackModel();
+    ~PlaybackModel();
+
     smooth_ui_toolkit::Observable<PlaybackState>& state()
     {
         return _state;
@@ -29,16 +33,19 @@ public:
 
     void load(const RecordingFile& file);
     void togglePlayPause();
+    void pause();
     void seek(float offsetSec);
     void toggleSpeed();
     void tick(uint32_t nowMs);
 
 private:
+    struct Impl;
+
     smooth_ui_toolkit::Observable<PlaybackState> _state{PlaybackState::Stopped};
     smooth_ui_toolkit::Observable<RecordingFile> _file{RecordingFile{}};
     smooth_ui_toolkit::Observable<float> _progress_sec{0.0f};
     smooth_ui_toolkit::Observable<float> _speed{1.0f};
-    uint32_t _last_tick_ms = 0;
+    std::unique_ptr<Impl> _impl;
 };
 
 }  // namespace recorder

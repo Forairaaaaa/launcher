@@ -12,6 +12,12 @@ void PlaybackViewModel::onEnter()
     spdlog::info("PlaybackViewModel enter");
 }
 
+void PlaybackViewModel::onExit()
+{
+    spdlog::info("PlaybackViewModel exit");
+    _model.pause();
+}
+
 void PlaybackViewModel::onKey(uint32_t key)
 {
     switch (key) {
