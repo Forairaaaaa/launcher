@@ -7,6 +7,13 @@
 
 namespace recorder {
 
+namespace recorder_key {
+
+constexpr uint32_t Up   = 0x10000001;
+constexpr uint32_t Down = 0x10000002;
+
+}  // namespace recorder_key
+
 enum class PageId {
     Recording,
     Files,

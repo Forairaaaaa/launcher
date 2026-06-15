@@ -38,12 +38,16 @@ void FilesViewModel::onKey(uint32_t key)
         case '4':
             _router.back();
             break;
+        case recorder_key::Up:
         case '5':
             _files_model.selectPrevious();
             break;
+        case recorder_key::Down:
         case '6':
             _files_model.selectNext();
             break;
+        case '\r':
+        case '\n':
         case '7': {
             const RecordingFile* selected = _files_model.selectedFile();
             if (selected) {

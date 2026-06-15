@@ -188,7 +188,22 @@ void RecorderApp::onKeyboardEvent(lv_event_t* event)
         return;
     }
 
-    if (!textInputFocused() && key->utf8[0] >= '0' && key->utf8[0] <= '9') {
+    if (textInputFocused()) {
+        return;
+    }
+
+    switch (key->lv_key) {
+        case LV_KEY_UP:
+            self->onKey(recorder_key::Up);
+            return;
+        case LV_KEY_DOWN:
+            self->onKey(recorder_key::Down);
+            return;
+        default:
+            break;
+    }
+
+    if (key->utf8[0] >= '0' && key->utf8[0] <= '9') {
         self->onKey(static_cast<uint32_t>(key->utf8[0]));
     }
 }
