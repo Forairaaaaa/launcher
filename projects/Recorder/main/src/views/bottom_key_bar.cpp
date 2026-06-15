@@ -87,6 +87,8 @@ public:
             _current->addFlag(LV_OBJ_FLAG_HIDDEN);
             _current_opa.teleport(0);
         }
+
+        applyOpacity();
     }
 
     void tick()
