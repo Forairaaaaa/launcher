@@ -11,6 +11,8 @@ PARALLEL="${PARALLEL:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 STAGE_DIR="${STAGE_DIR:-${ROOT_DIR}/build/deb-root}"
 DIST_DIR="${DIST_DIR:-${ROOT_DIR}/dist}"
 BIN_NAME="M5CardputerZero-Recorder"
+PACKAGE_ICON_NAME="${PACKAGE_ICON_NAME:-m5cardputerzero-recorder.png}"
+RECORDINGS_DIR="${RECORDINGS_DIR:-\$HOME/Recordings}"
 
 if ! command -v dpkg-deb >/dev/null 2>&1; then
     echo "dpkg-deb not found. Install dpkg-dev first." >&2
@@ -55,8 +57,13 @@ mkdir -p \
     "${DIST_DIR}"
 
 install -m 755 "${EXECUTABLE}" "${STAGE_DIR}/usr/share/APPLaunch/bin/${BIN_NAME}"
-install -m 644 "${DESKTOP_FILE}" "${STAGE_DIR}/usr/share/APPLaunch/applications/recorder.desktop"
-install -m 644 "${ICON_FILE}" "${STAGE_DIR}/usr/share/APPLaunch/share/images/rec_100.png"
+DESKTOP_EXEC="mkdir -p \"${RECORDINGS_DIR}\" && exec /usr/share/APPLaunch/bin/${BIN_NAME} --recordings-dir \"${RECORDINGS_DIR}\""
+sed \
+    -e "s#^Exec=.*#Exec=${DESKTOP_EXEC//#/\\#}#" \
+    -e "s#^Icon=.*#Icon=share/images/${PACKAGE_ICON_NAME}#" \
+    "${DESKTOP_FILE}" \
+    >"${STAGE_DIR}/usr/share/APPLaunch/applications/recorder.desktop"
+install -m 644 "${ICON_FILE}" "${STAGE_DIR}/usr/share/APPLaunch/share/images/${PACKAGE_ICON_NAME}"
 
 INSTALLED_SIZE="$(du -sk "${STAGE_DIR}/usr" | awk '{print $1}')"
 cat >"${STAGE_DIR}/DEBIAN/control" <<EOF
