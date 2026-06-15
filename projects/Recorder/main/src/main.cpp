@@ -1,6 +1,7 @@
 #include "core/recorder_app.hpp"
 #include "core/recorder_config.hpp"
 #include "hal_lvgl_bsp.h"
+#include <core/hal/hal.hpp>
 #include <stdio.h>
 #include <string>
 #include <unistd.h>
@@ -65,6 +66,9 @@ int main(int argc, char* argv[])
 
     spdlog::info("Recorder: display {}x{}", (int)lv_display_get_horizontal_resolution(disp),
                  (int)lv_display_get_vertical_resolution(disp));
+
+    smooth_ui_toolkit::ui_hal::on_get_tick([]() { return lv_tick_get(); });
+    smooth_ui_toolkit::ui_hal::on_delay([](uint32_t ms) { usleep(ms * 1000); });
 
     recorder::RecorderApp app(config);
     app.start();
