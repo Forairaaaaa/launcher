@@ -58,11 +58,14 @@ mkdir -p \
 
 install -m 755 "${EXECUTABLE}" "${STAGE_DIR}/usr/share/APPLaunch/bin/${BIN_NAME}"
 DESKTOP_EXEC="mkdir -p \"${RECORDINGS_DIR}\" && exec /usr/share/APPLaunch/bin/${BIN_NAME} --recordings-dir \"${RECORDINGS_DIR}\""
-sed \
-    -e "s#^Exec=.*#Exec=${DESKTOP_EXEC//#/\\#}#" \
-    -e "s#^Icon=.*#Icon=share/images/${PACKAGE_ICON_NAME}#" \
-    "${DESKTOP_FILE}" \
-    >"${STAGE_DIR}/usr/share/APPLaunch/applications/recorder.desktop"
+cat >"${STAGE_DIR}/usr/share/APPLaunch/applications/recorder.desktop" <<EOF
+[Desktop Entry]
+Name=REC
+Exec=${DESKTOP_EXEC}
+Terminal=false
+Icon=share/images/${PACKAGE_ICON_NAME}
+Type=Application
+EOF
 install -m 644 "${ICON_FILE}" "${STAGE_DIR}/usr/share/APPLaunch/share/images/${PACKAGE_ICON_NAME}"
 
 INSTALLED_SIZE="$(du -sk "${STAGE_DIR}/usr" | awk '{print $1}')"
