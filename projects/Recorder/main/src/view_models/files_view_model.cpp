@@ -34,6 +34,7 @@ void FilesViewModel::onKey(uint32_t key)
     }
 
     switch (key) {
+        case '\x1b':
         case '4':
             _router.back();
             break;

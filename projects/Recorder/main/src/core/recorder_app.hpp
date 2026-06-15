@@ -29,6 +29,11 @@ public:
     void onKey(uint32_t key);
     void tick(uint32_t nowMs);
 
+    bool quitRequested() const
+    {
+        return _quit_requested;
+    }
+
     RecorderRouter& router()
     {
         return _router;
@@ -50,6 +55,7 @@ private:
     View* _current_view       = nullptr;
     lv_group_t* _input_group  = nullptr;
     size_t _route_observer_id = 0;
+    bool _quit_requested      = false;
 
     std::array<ViewModel*, 3> _view_models;
     std::array<View*, 3> _views;

@@ -75,9 +75,12 @@ int main(int argc, char* argv[])
 
     lv_obj_invalidate(lv_screen_active());
 
-    while (1) {
+    while (!app.quitRequested()) {
         lv_timer_handler();
         app.tick(lv_tick_get());
         usleep(10000);
     }
+
+    spdlog::info("Recorder: exit requested");
+    return 0;
 }

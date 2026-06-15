@@ -78,6 +78,12 @@ void RecorderApp::start()
 
 void RecorderApp::onKey(uint32_t key)
 {
+    if (key == '\x1b' && _router.page() == PageId::Recording && !_recording_model.pendingRecording().get().active) {
+        spdlog::info("RecorderApp: quit requested");
+        _quit_requested = true;
+        return;
+    }
+
     if (_current_vm) {
         _current_vm->onKey(key);
     }
