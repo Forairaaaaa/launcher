@@ -72,7 +72,9 @@ void RecorderApp::start()
     lv_obj_set_style_bg_opa(lv_screen_active(), LV_OPA_COVER, LV_PART_MAIN);
     setupInputGroup();
     _route_observer_id = _router.currentPage().observe(this, onRouteChanged);
+#if LV_USE_SDL
     lv_obj_add_event_cb(lv_screen_active(), onKeyboardEvent, keyboardEventCode(), this);
+#endif
     setCurrentPage(_router.page());
 }
 
@@ -86,6 +88,38 @@ void RecorderApp::onKey(uint32_t key)
 
     if (_current_vm) {
         _current_vm->onKey(key);
+    }
+}
+
+void RecorderApp::onLvglKey(uint32_t lv_key, const char* utf8)
+{
+    if (lv_key == LV_KEY_ESC) {
+        onKey('\x1b');
+        return;
+    }
+
+    if (lv_key == LV_KEY_ENTER) {
+        onKey('\r');
+        return;
+    }
+
+    if (textInputFocused()) {
+        return;
+    }
+
+    switch (lv_key) {
+        case LV_KEY_UP:
+            onKey(recorder_key::Up);
+            return;
+        case LV_KEY_DOWN:
+            onKey(recorder_key::Down);
+            return;
+        default:
+            break;
+    }
+
+    if (utf8 && utf8[0] >= '0' && utf8[0] <= '9') {
+        onKey(static_cast<uint32_t>(utf8[0]));
     }
 }
 
@@ -178,34 +212,7 @@ void RecorderApp::onKeyboardEvent(lv_event_t* event)
         return;
     }
 
-    if (key->lv_key == LV_KEY_ESC) {
-        self->onKey('\x1b');
-        return;
-    }
-
-    if (key->lv_key == LV_KEY_ENTER) {
-        self->onKey('\r');
-        return;
-    }
-
-    if (textInputFocused()) {
-        return;
-    }
-
-    switch (key->lv_key) {
-        case LV_KEY_UP:
-            self->onKey(recorder_key::Up);
-            return;
-        case LV_KEY_DOWN:
-            self->onKey(recorder_key::Down);
-            return;
-        default:
-            break;
-    }
-
-    if (key->utf8[0] >= '0' && key->utf8[0] <= '9') {
-        self->onKey(static_cast<uint32_t>(key->utf8[0]));
-    }
+    self->onLvglKey(key->lv_key, key->utf8);
 }
 
 }  // namespace recorder

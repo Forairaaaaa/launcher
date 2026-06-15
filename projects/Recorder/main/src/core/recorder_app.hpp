@@ -27,6 +27,7 @@ public:
 
     void start();
     void onKey(uint32_t key);
+    void onLvglKey(uint32_t lv_key, const char* utf8);
     void tick(uint32_t nowMs);
 
     bool quitRequested() const

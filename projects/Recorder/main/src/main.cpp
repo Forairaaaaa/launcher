@@ -1,6 +1,7 @@
 #include "core/recorder_app.hpp"
 #include "core/recorder_config.hpp"
 #include "hal_lvgl_bsp.h"
+#include "input/recorder_keypad.hpp"
 #include <core/hal/hal.hpp>
 #include <stdio.h>
 #include <string>
@@ -71,11 +72,21 @@ int main(int argc, char* argv[])
     smooth_ui_toolkit::ui_hal::on_delay([](uint32_t ms) { usleep(ms * 1000); });
 
     recorder::RecorderApp app(config);
+
+#if !LV_USE_SDL
+    recorder::RecorderKeypad keypad;
+    keypad.setKeyCallback([&app](uint32_t key, const char* utf8) { app.onLvglKey(key, utf8); });
+    keypad.openDefault();
+#endif
+
     app.start();
 
     lv_obj_invalidate(lv_screen_active());
 
     while (!app.quitRequested()) {
+#if !LV_USE_SDL
+        keypad.poll();
+#endif
         lv_timer_handler();
         app.tick(lv_tick_get());
         usleep(10000);
