@@ -134,6 +134,234 @@ lv_group_t* keyboardGroup()
 
 }  // namespace
 
+class MagicView {
+public:
+    void generate(uint32_t magic_serial, lv_obj_t* target)
+    {
+        if (magic_serial == 0 || magic_serial == _serial) {
+            return;
+        }
+
+        _serial     = magic_serial;
+        _active     = true;
+        _started_ms = lv_tick_get();
+        _now_ms     = _started_ms;
+
+        uint32_t seed = 0x9E3779B9u ^ (magic_serial * 0x85EBCA6Bu);
+        _launchX      = 0.28f + unit(seed) * 0.44f;
+        _launchDrift  = -0.16f + unit(seed) * 0.32f;
+        _burstX       = std::clamp(_launchX + _launchDrift, 0.18f, 0.82f);
+        _burstY       = 0.18f + unit(seed) * 0.22f;
+        _trailBend    = -0.05f + unit(seed) * 0.10f;
+        _trailColor   = nextColor(seed);
+        _spark_count  = 6 + (nextSeed(seed) % 3);
+
+        for (size_t i = 0; i < _spark_count; ++i) {
+            Spark& spark     = _sparks[i];
+            const float slot = static_cast<float>(i) / static_cast<float>(std::max<size_t>(_spark_count - 1, 1));
+            spark.angle      = -2.72f + slot * 4.9f + (-0.12f + unit(seed) * 0.24f);
+            spark.length     = 22.0f + unit(seed) * 26.0f;
+            spark.curl       = -5.0f + unit(seed) * 10.0f;
+            spark.gravity    = 6.0f + unit(seed) * 18.0f;
+            spark.delay      = unit(seed) * 0.18f;
+            spark.color      = nextColor(seed);
+        }
+
+        if (target) {
+            lv_obj_invalidate(target);
+        }
+    }
+
+    void tick(uint32_t nowMs)
+    {
+        if (!_active) {
+            return;
+        }
+
+        _now_ms = nowMs;
+        if (nowMs - _started_ms > static_cast<uint32_t>(kDuration * 1000.0f)) {
+            _active = false;
+        }
+    }
+
+    void draw(lv_layer_t* layer, const lv_area_t& coords, lv_color_t color) const
+    {
+        (void)color;
+        if (!_active || !layer) {
+            return;
+        }
+
+        const uint32_t elapsed_ms  = _now_ms - _started_ms;
+        const float progress       = std::clamp(static_cast<float>(elapsed_ms) / (kDuration * 1000.0f), 0.0f, 1.0f);
+        const float launchProgress = std::clamp(progress / kLaunchEnd, 0.0f, 1.0f);
+        const float burstProgress  = std::clamp((progress - kLaunchEnd) / (1.0f - kLaunchEnd), 0.0f, 1.0f);
+        const float trailFade      = std::clamp(burstProgress / kTrailFadeEnd, 0.0f, 1.0f);
+
+        lv_draw_line_dsc_t line_dsc;
+        lv_draw_line_dsc_init(&line_dsc);
+        line_dsc.color = _trailColor;
+        line_dsc.width = 2;
+
+        drawTrail(layer, line_dsc, coords, launchProgress, trailFade);
+
+        if (burstProgress <= 0.0f) {
+            return;
+        }
+
+        line_dsc.opa = static_cast<lv_opa_t>(
+            std::clamp(static_cast<int>(std::round(230.0f * std::sin(burstProgress * kPrismTwoPi * 0.5f))), 0, 230));
+        drawSparks(layer, line_dsc, coords, burstProgress);
+    }
+
+private:
+    struct Point {
+        float x = 0.0f;
+        float y = 0.0f;
+    };
+
+    struct Spark {
+        float angle      = 0.0f;
+        float length     = 24.0f;
+        float curl       = 0.0f;
+        float gravity    = 10.0f;
+        float delay      = 0.0f;
+        lv_color_t color = lv_color_hex(0xFFFFFF);
+    };
+
+    static constexpr float kDuration       = 1.55f;
+    static constexpr float kLaunchEnd      = 0.26f;
+    static constexpr float kTrailFadeEnd   = 0.42f;
+    static constexpr size_t kTrailSegments = 16;
+    static constexpr size_t kSparkSegments = 12;
+    static constexpr size_t kMaxSparkCount = 8;
+
+    std::array<Spark, kMaxSparkCount> _sparks{};
+    size_t _spark_count    = 0;
+    uint32_t _serial       = 0;
+    uint32_t _started_ms   = 0;
+    uint32_t _now_ms       = 0;
+    float _launchX         = 0.5f;
+    float _launchDrift     = 0.0f;
+    float _burstX          = 0.5f;
+    float _burstY          = 0.3f;
+    float _trailBend       = 0.0f;
+    lv_color_t _trailColor = lv_color_hex(0xFFFFFF);
+    bool _active           = false;
+
+    static uint32_t nextSeed(uint32_t& seed)
+    {
+        seed = seed * 1664525u + 1013904223u;
+        return seed;
+    }
+
+    static float unit(uint32_t& seed)
+    {
+        return static_cast<float>(nextSeed(seed) & 0xFFFFu) / 65535.0f;
+    }
+
+    static lv_color_t nextColor(uint32_t& seed)
+    {
+        static constexpr std::array<uint32_t, 7> colors = {
+            0xFFE66D, 0xFF6B6B, 0x4ECDC4, 0x7BDFF2, 0xB388FF, 0xF7A8B8, 0xA8E6CF,
+        };
+        return lv_color_hex(colors[nextSeed(seed) % colors.size()]);
+    }
+
+    static float easeOut(float value)
+    {
+        value = std::clamp(value, 0.0f, 1.0f);
+        return 1.0f - (1.0f - value) * (1.0f - value);
+    }
+
+    static float easeIn(float value)
+    {
+        value = std::clamp(value, 0.0f, 1.0f);
+        return value * value;
+    }
+
+    static lv_point_precise_t toLvPoint(const lv_area_t& coords, const Point& point)
+    {
+        return {
+            static_cast<int32_t>(
+                std::round(static_cast<float>(coords.x1) + point.x * static_cast<float>(kWaveformPanelWidth))),
+            static_cast<int32_t>(
+                std::round(static_cast<float>(coords.y1) + point.y * static_cast<float>(kWaveformPanelHeight))),
+        };
+    }
+
+    Point trailPoint(float t) const
+    {
+        const float rise = easeOut(t);
+        const float sway = std::sin(t * kPrismTwoPi * 0.5f) * _trailBend;
+        return {
+            _launchX + (_burstX - _launchX) * rise + sway * t * (1.0f - t),
+            0.96f + (_burstY - 0.96f) * rise,
+        };
+    }
+
+    void drawTrail(lv_layer_t* layer, lv_draw_line_dsc_t& line_dsc, const lv_area_t& coords, float progress,
+                   float fade) const
+    {
+        const size_t visible = static_cast<size_t>(std::ceil(progress * static_cast<float>(kTrailSegments)));
+        if (visible == 0) {
+            return;
+        }
+
+        lv_point_precise_t previous = toLvPoint(coords, trailPoint(0.0f));
+        for (size_t i = 1; i <= visible; ++i) {
+            const float t              = std::min(progress, static_cast<float>(i) / static_cast<float>(kTrailSegments));
+            lv_point_precise_t current = toLvPoint(coords, trailPoint(t));
+            const float tail           = static_cast<float>(i) / static_cast<float>(visible);
+            const float tailFade       = 0.35f + 0.65f * tail;
+            line_dsc.opa               = static_cast<lv_opa_t>(
+                std::clamp(static_cast<int>(std::round(220.0f * tailFade * (1.0f - fade))), 0, 220));
+            line_dsc.p1 = previous;
+            line_dsc.p2 = current;
+            lv_draw_line(layer, &line_dsc);
+            previous = current;
+        }
+    }
+
+    Point sparkPoint(const Spark& spark, float t) const
+    {
+        const float eased = easeOut(t);
+        const float bend  = std::sin(t * kPrismTwoPi * 0.5f) * spark.curl;
+        const float dx    = std::cos(spark.angle);
+        const float dy    = std::sin(spark.angle);
+        const float nx    = -dy;
+        const float ny    = dx;
+
+        return {
+            _burstX + (dx * spark.length * eased + nx * bend * t) / static_cast<float>(kWaveformPanelWidth),
+            _burstY + (dy * spark.length * eased + ny * bend * t + spark.gravity * easeIn(t)) /
+                          static_cast<float>(kWaveformPanelHeight),
+        };
+    }
+
+    void drawSparks(lv_layer_t* layer, lv_draw_line_dsc_t& line_dsc, const lv_area_t& coords, float progress) const
+    {
+        for (size_t spark_index = 0; spark_index < _spark_count; ++spark_index) {
+            const Spark& spark        = _sparks[spark_index];
+            const float sparkProgress = std::clamp((progress - spark.delay) / (1.0f - spark.delay), 0.0f, 1.0f);
+            if (sparkProgress <= 0.0f) {
+                continue;
+            }
+
+            line_dsc.color       = spark.color;
+            const size_t visible = static_cast<size_t>(std::ceil(sparkProgress * static_cast<float>(kSparkSegments)));
+            lv_point_precise_t previous = toLvPoint(coords, sparkPoint(spark, 0.0f));
+            for (size_t i = 1; i <= visible; ++i) {
+                const float t = std::min(sparkProgress, static_cast<float>(i) / static_cast<float>(kSparkSegments));
+                lv_point_precise_t current = toLvPoint(coords, sparkPoint(spark, t));
+                line_dsc.p1                = previous;
+                line_dsc.p2                = current;
+                lv_draw_line(layer, &line_dsc);
+                previous = current;
+            }
+        }
+    }
+};
+
 class RecordingWaveformViewBase {
 public:
     explicit RecordingWaveformViewBase(lv_obj_t* parent)
@@ -162,10 +390,16 @@ public:
         _color.move(recording ? kWaveformRecordingColor : kWaveformIdleColor);
     }
 
+    virtual void generateMagic(uint32_t magic_serial)
+    {
+        _magic_view.generate(magic_serial, _panel->raw_ptr());
+    }
+
     virtual void tick(uint32_t nowMs)
     {
         (void)nowMs;
         _color.update();
+        _magic_view.tick(nowMs);
         lv_obj_invalidate(_panel->raw_ptr());
     }
 
@@ -204,8 +438,14 @@ protected:
         return true;
     }
 
+    void drawMagic(lv_layer_t* layer, const lv_area_t& coords)
+    {
+        _magic_view.draw(layer, coords, currentColor());
+    }
+
 private:
     smooth_ui_toolkit::color::AnimateRgb_t _color;
+    MagicView _magic_view;
     uint32_t _last_render_ms = 0;
     bool _has_render_tick    = false;
 };
@@ -288,7 +528,7 @@ private:
 
             int32_t bar_h = kWaveformMinBarHeight +
                             static_cast<int32_t>(std::round(value * (kWaveformMaxBarHeight - kWaveformMinBarHeight)));
-            bar_h         = std::clamp(bar_h, kWaveformMinBarHeight, kWaveformMaxBarHeight);
+            bar_h = std::clamp(bar_h, kWaveformMinBarHeight, kWaveformMaxBarHeight);
 
             const int32_t x    = start_x + static_cast<int32_t>(index) * kWaveformBarPitch;
             const int32_t half = bar_h / 2;
@@ -300,6 +540,8 @@ private:
             lv_draw_line(layer, &line_dsc);
             ++index;
         });
+
+        drawMagic(layer, coords);
     }
 
     static void onDraw(lv_event_t* event)
@@ -407,6 +649,8 @@ private:
             has_previous = true;
             ++index;
         });
+
+        drawMagic(layer, coords);
     }
 
     static void onDraw(lv_event_t* event)
@@ -476,9 +720,9 @@ private:
 
         for (size_t i = 0; i < _bars.size(); ++i) {
             const float value = std::clamp(_bars[i], 0.0f, 1.0f);
-            int32_t height = kSpectrumMinBarHeight +
+            int32_t height    = kSpectrumMinBarHeight +
                              static_cast<int32_t>(std::round(value * (kSpectrumMaxBarHeight - kSpectrumMinBarHeight)));
-            height         = std::clamp(height, kSpectrumMinBarHeight, kSpectrumMaxBarHeight);
+            height = std::clamp(height, kSpectrumMinBarHeight, kSpectrumMaxBarHeight);
 
             lv_area_t bar_area{};
             bar_area.x1 = start_x + static_cast<int32_t>(i) * kSpectrumBarPitch;
@@ -1361,11 +1605,13 @@ void RecordingView::onEnter(lv_obj_t* parent)
     _fade_mask_opacity.teleport(255);
     _fade_mask_opacity.move(0);
 
-    _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
+    _key_bar           = std::make_unique<BottomKeyBar>(_root->raw_ptr());
+    _magic_serial_seen = _view_model.magic().get();
     _view_model.state().observe(this, onStateChanged);
     _view_model.elapsedSec().observe(this, onElapsedChanged);
     _view_model.frame().observe(this, onFrameChanged);
     _view_model.waveformType().observe(this, onWaveformTypeChanged);
+    _view_model.magic().observe(this, onMagicChanged);
     _view_model.pendingRecording().observe(this, onPendingRecordingChanged);
     _view_model.pendingRecordingName().observe(this, onPendingRecordingNameChanged);
 }
@@ -1374,6 +1620,7 @@ void RecordingView::onExit()
 {
     _view_model.pendingRecordingName().removeObserver();
     _view_model.pendingRecording().removeObserver();
+    _view_model.magic().removeObserver();
     _view_model.waveformType().removeObserver();
     _view_model.frame().removeObserver();
     _view_model.elapsedSec().removeObserver();
@@ -1491,6 +1738,18 @@ void RecordingView::renderWaveformType(RecordingWaveformType type)
     renderState(_view_model.state().get());
 }
 
+void RecordingView::renderMagic(uint32_t magic_serial)
+{
+    if (magic_serial == 0 || magic_serial == _magic_serial_seen) {
+        return;
+    }
+
+    _magic_serial_seen = magic_serial;
+    if (_waveform) {
+        _waveform->generateMagic(magic_serial);
+    }
+}
+
 void RecordingView::renderPendingRecording(const PendingRecordingFile& pending)
 {
     if (_file_confirm_dialog) {
@@ -1534,6 +1793,14 @@ void RecordingView::onWaveformTypeChanged(void* context, const RecordingWaveform
     auto* self = static_cast<RecordingView*>(context);
     if (self) {
         self->renderWaveformType(type);
+    }
+}
+
+void RecordingView::onMagicChanged(void* context, const uint32_t& magic_serial)
+{
+    auto* self = static_cast<RecordingView*>(context);
+    if (self) {
+        self->renderMagic(magic_serial);
     }
 }
 

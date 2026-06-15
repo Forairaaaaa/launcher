@@ -45,6 +45,7 @@ RecordingViewModel::RecordingViewModel(RecorderRouter& router, RecordingModel& m
 void RecordingViewModel::onEnter()
 {
     spdlog::info("RecordingViewModel enter");
+    _magic_count = 0;
 }
 
 void RecordingViewModel::onKey(uint32_t key)
@@ -65,6 +66,17 @@ void RecordingViewModel::onKey(uint32_t key)
     }
 
     switch (key) {
+        case ' ':
+            if (canGenerateMagic()) {
+                ++_magic_count;
+                if (_magic_count >= 3) {
+                    _magic_count = 0;
+                    generateMagic();
+                }
+            } else {
+                _magic_count = 0;
+            }
+            break;
         case '4': {
             RecordingWaveformType next_type = nextWaveformType(_waveform_type.get());
             spdlog::info("RecordingViewModel: switch waveform type={}", waveformTypeName(next_type));
@@ -137,6 +149,19 @@ void RecordingViewModel::syncPendingRecordingName()
         _pending_recording_close_action = PendingRecordingCloseAction::None;
     }
     _pending_recording_name.set(pending.active ? pending.name : "");
+}
+
+bool RecordingViewModel::canGenerateMagic() const
+{
+    const auto state = _model.state().get();
+    const auto type  = _waveform_type.get();
+    return state == RecordingState::Idle &&
+           (type == RecordingWaveformType::Basic || type == RecordingWaveformType::Line);
+}
+
+void RecordingViewModel::generateMagic()
+{
+    _magic.set(_magic.get() + 1);
 }
 
 }  // namespace recorder

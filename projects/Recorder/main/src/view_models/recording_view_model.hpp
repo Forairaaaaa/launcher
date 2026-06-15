@@ -62,6 +62,11 @@ public:
         return _waveform_type;
     }
 
+    smooth_ui_toolkit::SingleObservable<uint32_t>& magic()
+    {
+        return _magic;
+    }
+
     PendingRecordingCloseAction pendingRecordingCloseAction() const
     {
         return _pending_recording_close_action;
@@ -75,10 +80,14 @@ private:
     RecordingModel& _model;
     smooth_ui_toolkit::SingleObservable<RecordingWaveformType> _waveform_type{RecordingWaveformType::Basic};
     smooth_ui_toolkit::SingleObservable<std::string> _pending_recording_name{""};
+    smooth_ui_toolkit::SingleObservable<uint32_t> _magic{0};
     PendingRecordingCloseAction _pending_recording_close_action = PendingRecordingCloseAction::None;
     bool _pending_recording_active                              = false;
+    uint32_t _magic_count                                       = 0;
 
     void syncPendingRecordingName();
+    bool canGenerateMagic() const;
+    void generateMagic();
 };
 
 }  // namespace recorder

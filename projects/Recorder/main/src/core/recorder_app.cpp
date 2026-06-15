@@ -118,6 +118,11 @@ void RecorderApp::onLvglKey(uint32_t lv_key, const char* utf8)
             break;
     }
 
+    if (utf8 && utf8[0] == ' ') {
+        onKey(' ');
+        return;
+    }
+
     if (utf8 && utf8[0] >= '0' && utf8[0] <= '9') {
         onKey(static_cast<uint32_t>(utf8[0]));
     }

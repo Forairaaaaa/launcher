@@ -38,18 +38,21 @@ private:
     std::unique_ptr<FileConfirmDialog> _file_confirm_dialog;
     std::unique_ptr<PausedLabel> _paused_label;
     std::unique_ptr<BottomKeyBar> _key_bar;
+    uint32_t _magic_serial_seen = 0;
 
     void createWaveform(RecordingWaveformType type);
     void renderState(RecordingState state);
     void renderElapsed(uint32_t elapsed_sec);
     void renderFrame(const AudioFrame& frame);
     void renderWaveformType(RecordingWaveformType type);
+    void renderMagic(uint32_t magic_serial);
     void renderPendingRecording(const PendingRecordingFile& pending);
     void renderPendingRecordingName(const std::string& name);
     static void onStateChanged(void* context, const RecordingState& state);
     static void onElapsedChanged(void* context, const uint32_t& elapsed_sec);
     static void onFrameChanged(void* context, const AudioFrame& frame);
     static void onWaveformTypeChanged(void* context, const RecordingWaveformType& type);
+    static void onMagicChanged(void* context, const uint32_t& magic_serial);
     static void onPendingRecordingChanged(void* context, const PendingRecordingFile& pending);
     static void onPendingRecordingNameChanged(void* context, const std::string& name);
 };
