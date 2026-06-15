@@ -80,7 +80,7 @@ for src in lvgl_component['SRCS']:
         lvgl_component['SRCS'].remove(src)
 
 env['COMPONENTS'].append({
-    'target': env['PROJECT_NAME'],
+    'target': 'M5CardputerZero-Recorder',
     'SRCS': SRCS,
     'INCLUDE': INCLUDE,
     'PRIVATE_INCLUDE': PRIVATE_INCLUDE,
