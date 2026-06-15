@@ -228,7 +228,7 @@ private:
         lv_color_t color = lv_color_hex(0xFFFFFF);
     };
 
-    static constexpr float kDuration       = 1.55f;
+    static constexpr float kDuration       = 1.15f;
     static constexpr float kLaunchEnd      = 0.26f;
     static constexpr float kTrailFadeEnd   = 0.42f;
     static constexpr size_t kTrailSegments = 16;
