@@ -147,13 +147,14 @@ public:
         _started_ms = lv_tick_get();
         _now_ms     = _started_ms;
 
-        uint32_t seed = 0x9E3779B9u ^ (magic_serial * 0x85EBCA6Bu);
-        _launchX      = 0.28f + unit(seed) * 0.44f;
-        _launchDrift  = -0.16f + unit(seed) * 0.32f;
-        _burstX       = std::clamp(_launchX + _launchDrift, 0.18f, 0.82f);
-        _burstY       = 0.18f + unit(seed) * 0.22f;
-        _trailColor   = nextColor(seed);
-        _spark_count  = 6 + (nextSeed(seed) % 3);
+        uint32_t seed  = 0x9E3779B9u ^ (magic_serial * 0x85EBCA6Bu);
+        _launchX       = 0.28f + unit(seed) * 0.44f;
+        _launchDrift   = -0.16f + unit(seed) * 0.32f;
+        _burstX        = std::clamp(_launchX + _launchDrift, 0.18f, 0.82f);
+        _burstY        = 0.18f + unit(seed) * 0.22f;
+        _trailColor    = nextColor(seed);
+        _spark_count   = 6 + (nextSeed(seed) % 3);
+        _twinkle_count = 8 + (nextSeed(seed) % 5);
 
         for (size_t i = 0; i < _spark_count; ++i) {
             Spark& spark     = _sparks[i];
@@ -163,6 +164,18 @@ public:
             spark.gravity    = 2.0f + unit(seed) * 8.0f;
             spark.delay      = unit(seed) * 0.18f;
             spark.color      = nextColor(seed);
+        }
+
+        for (size_t i = 0; i < _twinkle_count; ++i) {
+            Twinkle& twinkle     = _twinkles[i];
+            const float angle    = unit(seed) * kPrismTwoPi;
+            const float distance = 0.12f + unit(seed) * 0.34f;
+            twinkle.x            = std::clamp(_burstX + std::cos(angle) * distance, 0.06f, 0.94f);
+            twinkle.y            = std::clamp(_burstY + std::sin(angle) * distance * 0.72f, 0.06f, 0.86f);
+            twinkle.size         = 1.8f + unit(seed) * 2.8f;
+            twinkle.delay        = 0.14f + unit(seed) * 0.56f;
+            twinkle.life         = 0.18f + unit(seed) * 0.22f;
+            twinkle.color        = nextColor(seed);
         }
 
         if (target) {
@@ -209,6 +222,7 @@ public:
         line_dsc.opa = static_cast<lv_opa_t>(
             std::clamp(static_cast<int>(std::round(230.0f * std::sin(burstProgress * kPrismTwoPi * 0.5f))), 0, 230));
         drawSparks(layer, line_dsc, coords, burstProgress);
+        drawTwinkles(layer, line_dsc, coords, burstProgress);
     }
 
 private:
@@ -225,15 +239,27 @@ private:
         lv_color_t color = lv_color_hex(0xFFFFFF);
     };
 
-    static constexpr float kDuration       = 1.55f;
-    static constexpr float kLaunchEnd      = 0.26f;
-    static constexpr float kTrailFadeEnd   = 0.42f;
-    static constexpr size_t kTrailSegments = 16;
-    static constexpr size_t kSparkSegments = 12;
-    static constexpr size_t kMaxSparkCount = 8;
+    struct Twinkle {
+        float x          = 0.5f;
+        float y          = 0.3f;
+        float size       = 3.0f;
+        float delay      = 0.0f;
+        float life       = 0.24f;
+        lv_color_t color = lv_color_hex(0xFFFFFF);
+    };
+
+    static constexpr float kDuration         = 1.55f;
+    static constexpr float kLaunchEnd        = 0.26f;
+    static constexpr float kTrailFadeEnd     = 0.42f;
+    static constexpr size_t kTrailSegments   = 16;
+    static constexpr size_t kSparkSegments   = 12;
+    static constexpr size_t kMaxSparkCount   = 8;
+    static constexpr size_t kMaxTwinkleCount = 12;
 
     std::array<Spark, kMaxSparkCount> _sparks{};
+    std::array<Twinkle, kMaxTwinkleCount> _twinkles{};
     size_t _spark_count    = 0;
+    size_t _twinkle_count  = 0;
     uint32_t _serial       = 0;
     uint32_t _started_ms   = 0;
     uint32_t _now_ms       = 0;
@@ -350,6 +376,35 @@ private:
                 lv_draw_line(layer, &line_dsc);
                 previous = current;
             }
+        }
+    }
+
+    void drawTwinkles(lv_layer_t* layer, lv_draw_line_dsc_t& line_dsc, const lv_area_t& coords, float progress) const
+    {
+        for (size_t i = 0; i < _twinkle_count; ++i) {
+            const Twinkle& twinkle = _twinkles[i];
+            const float local      = (progress - twinkle.delay) / twinkle.life;
+            if (local <= 0.0f || local >= 1.0f) {
+                continue;
+            }
+
+            const float glow = std::sin(local * kPrismTwoPi);
+            const int32_t cx = static_cast<int32_t>(
+                std::round(static_cast<float>(coords.x1) + twinkle.x * static_cast<float>(kWaveformPanelWidth)));
+            const int32_t cy = static_cast<int32_t>(
+                std::round(static_cast<float>(coords.y1) + twinkle.y * static_cast<float>(kWaveformPanelHeight)));
+            const int32_t size = std::max<int32_t>(1, static_cast<int32_t>(std::round(twinkle.size * glow)));
+
+            line_dsc.color = twinkle.color;
+            line_dsc.width = 1;
+            line_dsc.opa   = static_cast<lv_opa_t>(std::clamp(static_cast<int>(std::round(230.0f * glow)), 0, 230));
+
+            line_dsc.p1 = {cx - size, cy};
+            line_dsc.p2 = {cx + size, cy};
+            lv_draw_line(layer, &line_dsc);
+            line_dsc.p1 = {cx, cy - size};
+            line_dsc.p2 = {cx, cy + size};
+            lv_draw_line(layer, &line_dsc);
         }
     }
 };
