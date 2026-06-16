@@ -1,0 +1,11 @@
+config COMPILE_FOR_WEB
+    bool 'compile web app'
+    default n
+
+config COMPILE_FOR_WIN32
+    bool 'compile win32 app'
+    default n
+
+config COMPILE_FOR_LINUX
+    bool 'compile linux app'
+    default n

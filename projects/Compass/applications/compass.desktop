@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Compass
+Exec=/usr/share/APPLaunch/bin/M5CardputerZero-Compass
+Terminal=false
+Icon=share/images/compass.png
+Type=Application
