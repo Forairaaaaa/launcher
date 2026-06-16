@@ -10,15 +10,19 @@ CompassViewModel::CompassViewModel(CompassRouter& router, CompassModel& model) :
 void CompassViewModel::onEnter()
 {
     spdlog::info("CompassViewModel enter");
+    _info_expanded.set(false);
 }
 
 void CompassViewModel::onKey(uint32_t key)
 {
     switch (key) {
+        case '7':
+            if (_info_expanded.get()) {
+                _router.push(PageId::Calibration);
+            }
+            break;
         case '8':
-        case '\r':
-        case '\n':
-            _router.push(PageId::Calibration);
+            _info_expanded.set(!_info_expanded.get());
             break;
         default:
             break;

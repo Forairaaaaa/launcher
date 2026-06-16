@@ -1,8 +1,8 @@
 #pragma once
 
 #include "view_models/compass_view_model.hpp"
+#include "views/bottom_key_bar.hpp"
 #include "views/view.hpp"
-#include <lvgl/lvgl_cpp/label.hpp>
 #include <lvgl/lvgl_cpp/obj.hpp>
 #include <memory>
 
@@ -20,8 +20,10 @@ public:
 private:
     CompassViewModel& _view_model;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _root;
-    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _title_label;
-    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label> _hint_label;
+    std::unique_ptr<BottomKeyBar> _key_bar;
+
+    void renderInfoExpanded(bool expanded);
+    static void onInfoExpandedChanged(void* context, const bool& expanded);
 };
 
 }  // namespace compass

@@ -1,9 +1,15 @@
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 Import('env')
 with open(env['PROJECT_TOOL_S']) as f:
     exec(f.read())
+
+ASSETS_CONVERT = Path(env['component_dir']) / 'src' / 'assets' / 'convert_images.py'
+if ASSETS_CONVERT.exists():
+    subprocess.check_call([sys.executable, str(ASSETS_CONVERT)])
 
 SRCS = append_srcs_dir([ADir('src')])
 INCLUDE = [ADir('.'), ADir('src')]

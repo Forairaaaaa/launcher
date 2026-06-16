@@ -1,4 +1,5 @@
 #include "views/compass_view.hpp"
+#include "assets/assets.h"
 #include <spdlog/spdlog.h>
 
 namespace compass {
@@ -25,32 +26,54 @@ void CompassView::onEnter(lv_obj_t* parent)
     _root->setScrollbarMode(LV_SCROLLBAR_MODE_OFF);
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
-    _title_label = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_root->raw_ptr());
-    _title_label->setText("Compass");
-    _title_label->setTextColor(lv_color_hex(0xFFFFFF));
-    _title_label->setTextAlign(LV_TEXT_ALIGN_CENTER);
-    _title_label->align(LV_ALIGN_CENTER, 0, -12);
+    _key_bar = std::make_unique<BottomKeyBar>(_root->raw_ptr());
 
-    _hint_label = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_root->raw_ptr());
-    _hint_label->setText("8 / Enter: Calibrate");
-    _hint_label->setTextColor(lv_color_hex(0x777777));
-    _hint_label->setTextAlign(LV_TEXT_ALIGN_CENTER);
-    _hint_label->align(LV_ALIGN_CENTER, 0, 18);
+    _view_model.infoExpanded().observe(this, onInfoExpandedChanged);
+    renderInfoExpanded(_view_model.infoExpanded().get());
 
     spdlog::info("CompassView enter");
 }
 
 void CompassView::onExit()
 {
-    _hint_label.reset();
-    _title_label.reset();
+    _view_model.infoExpanded().removeObserver();
+    _key_bar.reset();
     _root.reset();
 }
 
 void CompassView::tick(uint32_t nowMs)
 {
     (void)nowMs;
-    (void)_view_model;
+    if (_key_bar) {
+        _key_bar->tick();
+    }
+}
+
+void CompassView::renderInfoExpanded(bool expanded)
+{
+    if (!_key_bar) {
+        return;
+    }
+
+    if (expanded) {
+        _key_bar->setItems({
+            {'7', &image_icon_calibration},
+            {'8', &image_icon_back},
+        });
+        return;
+    }
+
+    _key_bar->setItems({
+        {'8', &image_icon_more},
+    });
+}
+
+void CompassView::onInfoExpandedChanged(void* context, const bool& expanded)
+{
+    auto* self = static_cast<CompassView*>(context);
+    if (self) {
+        self->renderInfoExpanded(expanded);
+    }
 }
 
 }  // namespace compass
