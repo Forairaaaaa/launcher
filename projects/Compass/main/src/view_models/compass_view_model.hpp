@@ -18,9 +18,9 @@ public:
     void onKey(uint32_t key) override;
     void tick(uint32_t nowMs) override;
 
-    smooth_ui_toolkit::SingleObservable<CompassReading>& reading()
+    smooth_ui_toolkit::SingleObservable<CompassSample>& sample()
     {
-        return _model.reading();
+        return _model.sample();
     }
 
 private:

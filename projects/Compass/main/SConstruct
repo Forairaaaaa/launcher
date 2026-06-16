@@ -37,6 +37,7 @@ lvgl_component = list(
 
 if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
     import platform
+    DEFINITIONS += ['-DCOMPASS_USE_MOCK_IMU=1']
     lvgl_component['REQUIREMENTS'] += ['SDL2']
     if platform.system() == 'Darwin':
         sdl2_cflags = pkg_config_cflags('sdl2')
@@ -55,6 +56,8 @@ if 'CONFIG_V9_5_LV_USE_SDL' in os.environ:
     else:
         lvgl_component['INCLUDE'] += ['/usr/include/SDL2']
     lvgl_component['DEFINITIONS'] += ['-D_REENTRANT']
+else:
+    DEFINITIONS += ['-DCOMPASS_USE_IIO_IMU=1']
 
 for src in lvgl_component['SRCS']:
     if 'lv_sdl_keyboard.c' in str(src):
