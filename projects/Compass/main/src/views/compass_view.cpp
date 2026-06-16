@@ -3,16 +3,19 @@
 #include <core/animation/animate_value/animate_value.hpp>
 #include <core/easing/ease.hpp>
 #include <lvgl/lvgl_cpp/image.hpp>
+#include <lvgl/lvgl_cpp/label.hpp>
 #include <spdlog/spdlog.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstdio>
 
 namespace compass {
 
 namespace {
 
 constexpr int32_t kCompassPanelSize          = 150;
-constexpr int32_t kCompassExpandedX          = -73;
+constexpr int32_t kCompassExpandedX          = -68;
 constexpr int32_t kLargeCrossSize            = 72;
 constexpr int32_t kSmallCrossSize            = 21;
 constexpr int32_t kCrossThickness            = 1;
@@ -25,6 +28,32 @@ constexpr float kGravityMetersPerSecond      = 9.81f;
 constexpr float kCompassUnavailableHeading   = 0.0f;
 constexpr float kCompassUnavailableBubblePos = 0.0f;
 constexpr float kCompassUnavailableBubbleZ   = 1.0f;
+constexpr int32_t kInfoPanelX                = 184;
+constexpr int32_t kInfoPanelHiddenOffsetX    = 150;
+constexpr int32_t kInfoPanelWidth            = 124;
+constexpr int32_t kInfoPanelHeight           = 38;
+constexpr int32_t kInfoSidebarWidth          = 3;
+constexpr int32_t kInfoSidebarRadius         = 1;
+constexpr int32_t kInfoLabelX                = 10;
+constexpr int32_t kInfoLabelWidth            = 54;
+constexpr int32_t kInfoLabelHeight           = 12;
+constexpr int32_t kInfoBarX                  = 67;
+constexpr int32_t kInfoBarMaxWidth           = 56;
+constexpr int32_t kInfoBarHeight             = 6;
+constexpr int32_t kInfoBarRadius             = 1;
+constexpr uint32_t kInfoSidebarColor         = 0x4C4C4C;
+constexpr uint32_t kInfoTextColor            = 0xF2F2F2;
+constexpr uint32_t kInfoPositiveBarColor     = 0x53D671;
+constexpr uint32_t kInfoNegativeBarColor     = 0xFED40D;
+constexpr float kInfoMoveDuration            = 0.5f;
+constexpr float kInfoMoveBounce              = 0.3f;
+constexpr float kInfoFadeDuration            = 0.8f;
+constexpr float kInfoFadeDelayStep           = 0.08f;
+constexpr std::array<int32_t, 3> kInfoPanelY = {11, 52, 94};
+constexpr std::array<int32_t, 3> kInfoRowY   = {0, 14, 28};
+constexpr float kAccelRange                  = 10.0f;
+constexpr float kGyroRange                   = 1.0f;
+constexpr float kMagRange                    = 50.0f;
 
 float clampNormalized(float value)
 {
@@ -34,6 +63,11 @@ float clampNormalized(float value)
 float clampZeroToOne(float value)
 {
     return std::clamp(value, 0.0f, 1.0f);
+}
+
+lv_opa_t toOpa(float value)
+{
+    return static_cast<lv_opa_t>(std::clamp(static_cast<int>(std::round(value)), 0, 255));
 }
 
 float unwrapAngle(float previous_unwrapped_angle, float next_angle)
@@ -209,6 +243,213 @@ private:
     }
 };
 
+class CompassInfoPanel {
+public:
+    CompassInfoPanel(lv_obj_t* parent, int32_t y, std::array<const char*, 3> labels, float range)
+        : _y(y), _labels(labels), _range(range)
+    {
+        _opacity.easingOptions().duration       = kInfoFadeDuration;
+        _opacity.easingOptions().easingFunction = smooth_ui_toolkit::ease::ease_out_quad;
+        _opacity.teleport(0.0f);
+
+        _panel = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(parent);
+        _panel->setSize(kInfoPanelWidth, kInfoPanelHeight);
+        _panel->setBgOpa(LV_OPA_TRANSP);
+        _panel->setBorderWidth(0);
+        _panel->setOutlineWidth(0);
+        _panel->setShadowWidth(0);
+        _panel->setPaddingAll(0);
+        _panel->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+
+        _sidebar = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr());
+        _sidebar->setSize(kInfoSidebarWidth, kInfoPanelHeight);
+        _sidebar->setPos(0, 0);
+        _sidebar->setBgColor(lv_color_hex(kInfoSidebarColor));
+        _sidebar->setBgOpa(LV_OPA_COVER);
+        _sidebar->setRadius(kInfoSidebarRadius);
+        _sidebar->setBorderWidth(0);
+        _sidebar->setOutlineWidth(0);
+        _sidebar->setShadowWidth(0);
+        _sidebar->setPaddingAll(0);
+        _sidebar->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+        for (size_t i = 0; i < _value_labels.size(); ++i) {
+            _value_labels[i] = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr());
+            _value_labels[i]->setTextFont(&font_chivo_mono_medium_12);
+            _value_labels[i]->setTextColor(lv_color_hex(kInfoTextColor));
+            _value_labels[i]->setTextAlign(LV_TEXT_ALIGN_LEFT);
+            _value_labels[i]->setSize(kInfoLabelWidth, kInfoLabelHeight);
+            _value_labels[i]->setPos(kInfoLabelX, kInfoRowY[i] - 1);
+            _value_labels[i]->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+            _bars[i] = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr());
+            _bars[i]->setSize(0, kInfoBarHeight);
+            _bars[i]->setPos(kInfoBarX, kInfoRowY[i] + 2);
+            _bars[i]->setBgOpa(LV_OPA_COVER);
+            _bars[i]->setRadius(kInfoBarRadius);
+            _bars[i]->setBorderWidth(0);
+            _bars[i]->setOutlineWidth(0);
+            _bars[i]->setShadowWidth(0);
+            _bars[i]->setPaddingAll(0);
+            _bars[i]->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        }
+
+        setValues(Axis3{});
+        setX(kInfoPanelX + kInfoPanelHiddenOffsetX);
+        applyOpacity();
+    }
+
+    void setX(int32_t x)
+    {
+        if (_panel) {
+            _panel->setPos(x, _y);
+        }
+    }
+
+    void setExpanded(bool expanded, float delay)
+    {
+        if (expanded == _expanded) {
+            return;
+        }
+
+        _opacity.update();
+        _expanded      = expanded;
+        _opacity.delay = expanded ? delay : 0.0f;
+        if (_expanded) {
+            _panel->removeFlag(LV_OBJ_FLAG_HIDDEN);
+            _opacity.move(255.0f);
+        } else {
+            _opacity.move(0.0f);
+        }
+        applyOpacity();
+    }
+
+    void setValues(const Axis3& values)
+    {
+        _values = values;
+        applyValues();
+    }
+
+    void tick()
+    {
+        _opacity.update();
+        applyOpacity();
+
+        if (!_expanded && _opacity.done() && _opacity.directValue() <= 0.0f) {
+            _panel->addFlag(LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+private:
+    int32_t _y = 0;
+    std::array<const char*, 3> _labels{};
+    float _range = 1.0f;
+    Axis3 _values;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _sidebar;
+    std::array<std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label>, 3> _value_labels;
+    std::array<std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container>, 3> _bars;
+    smooth_ui_toolkit::AnimateValue _opacity{0};
+    bool _expanded = false;
+
+    float valueAt(size_t index) const
+    {
+        switch (index) {
+            case 0:
+                return _values.x;
+            case 1:
+                return _values.y;
+            default:
+                return _values.z;
+        }
+    }
+
+    void applyValues()
+    {
+        for (size_t i = 0; i < _value_labels.size(); ++i) {
+            const float value = valueAt(i);
+
+            char buffer[16] = {};
+            std::snprintf(buffer, sizeof(buffer), "%s:%+.1f", _labels[i], value);
+            _value_labels[i]->setText(buffer);
+
+            const float ratio = _range <= 0.0f ? 0.0f : std::min(std::abs(value) / _range, 1.0f);
+            _bars[i]->setWidth(static_cast<int32_t>(std::round(ratio * kInfoBarMaxWidth)));
+            _bars[i]->setBgColor(lv_color_hex(value >= 0.0f ? kInfoPositiveBarColor : kInfoNegativeBarColor));
+        }
+    }
+
+    void applyOpacity()
+    {
+        if (_panel) {
+            _panel->setOpa(toOpa(_opacity.directValue()));
+        }
+    }
+};
+
+class CompassInfoView {
+public:
+    explicit CompassInfoView(lv_obj_t* parent)
+    {
+        _x.springOptions().visualDuration = kInfoMoveDuration;
+        _x.springOptions().bounce         = kInfoMoveBounce;
+        _x.teleport(kInfoPanelHiddenOffsetX);
+
+        _accel_panel = std::make_unique<CompassInfoPanel>(parent, kInfoPanelY[0],
+                                                          std::array<const char*, 3>{"AX", "AY", "AZ"}, kAccelRange);
+        _gyro_panel  = std::make_unique<CompassInfoPanel>(parent, kInfoPanelY[1],
+                                                          std::array<const char*, 3>{"GX", "GY", "GZ"}, kGyroRange);
+        _mag_panel   = std::make_unique<CompassInfoPanel>(parent, kInfoPanelY[2],
+                                                          std::array<const char*, 3>{"MX", "MY", "MZ"}, kMagRange);
+        applyX();
+    }
+
+    void setExpanded(bool expanded)
+    {
+        if (expanded == _expanded) {
+            return;
+        }
+
+        _expanded = expanded;
+        _x.move(_expanded ? 0.0f : static_cast<float>(kInfoPanelHiddenOffsetX));
+        _accel_panel->setExpanded(_expanded, 0.0f);
+        _gyro_panel->setExpanded(_expanded, kInfoFadeDelayStep);
+        _mag_panel->setExpanded(_expanded, kInfoFadeDelayStep * 2.0f);
+    }
+
+    void setSample(const CompassSample& sample)
+    {
+        _accel_panel->setValues(sample.accel);
+        _gyro_panel->setValues(sample.gyro);
+        _mag_panel->setValues(sample.mag);
+    }
+
+    void tick()
+    {
+        _x.update();
+        applyX();
+        _accel_panel->tick();
+        _gyro_panel->tick();
+        _mag_panel->tick();
+    }
+
+private:
+    std::unique_ptr<CompassInfoPanel> _accel_panel;
+    std::unique_ptr<CompassInfoPanel> _gyro_panel;
+    std::unique_ptr<CompassInfoPanel> _mag_panel;
+    smooth_ui_toolkit::AnimateValue _x{kInfoPanelHiddenOffsetX};
+    bool _expanded = false;
+
+    void applyX()
+    {
+        const int32_t x = kInfoPanelX + static_cast<int32_t>(std::round(_x.directValue()));
+        _accel_panel->setX(x);
+        _gyro_panel->setX(x);
+        _mag_panel->setX(x);
+    }
+};
+
 CompassView::CompassView(CompassViewModel& view_model) : _view_model(view_model)
 {
 }
@@ -232,6 +473,7 @@ void CompassView::onEnter(lv_obj_t* parent)
     _root->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
 
     _compass_dial = std::make_unique<CompassDialView>(_root->raw_ptr());
+    _info_view    = std::make_unique<CompassInfoView>(_root->raw_ptr());
     _key_bar      = std::make_unique<BottomKeyBar>(_root->raw_ptr());
 
     _view_model.sample().observe(this, onSampleChanged);
@@ -247,6 +489,7 @@ void CompassView::onExit()
     _view_model.infoExpanded().removeObserver();
     _view_model.sample().removeObserver();
     _key_bar.reset();
+    _info_view.reset();
     _compass_dial.reset();
     _root.reset();
 }
@@ -256,6 +499,9 @@ void CompassView::tick(uint32_t nowMs)
     (void)nowMs;
     if (_compass_dial) {
         _compass_dial->tick();
+    }
+    if (_info_view) {
+        _info_view->tick();
     }
     if (_key_bar) {
         _key_bar->tick();
@@ -267,12 +513,18 @@ void CompassView::renderSample(const CompassSample& sample)
     if (_compass_dial) {
         _compass_dial->setSample(sample);
     }
+    if (_info_view) {
+        _info_view->setSample(sample);
+    }
 }
 
 void CompassView::renderInfoExpanded(bool expanded)
 {
     if (_compass_dial) {
         _compass_dial->setExpanded(expanded);
+    }
+    if (_info_view) {
+        _info_view->setExpanded(expanded);
     }
 
     if (!_key_bar) {
