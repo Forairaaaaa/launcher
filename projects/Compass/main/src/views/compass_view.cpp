@@ -371,7 +371,11 @@ private:
             const float value = valueAt(i);
 
             char buffer[16] = {};
-            std::snprintf(buffer, sizeof(buffer), "%s:%+.1f", _labels[i], value);
+            if (std::abs(value) < 10.0f) {
+                std::snprintf(buffer, sizeof(buffer), "%s:%+.1f", _labels[i], value);
+            } else {
+                std::snprintf(buffer, sizeof(buffer), "%s:%+.0f", _labels[i], value);
+            }
             _value_labels[i]->setText(buffer);
 
             const float ratio = _range <= 0.0f ? 0.0f : std::min(std::abs(value) / _range, 1.0f);
