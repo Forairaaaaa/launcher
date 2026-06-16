@@ -19,7 +19,7 @@ namespace recorder {
 
 namespace {
 
-constexpr int32_t kWaveformPanelWidth            = 256;
+constexpr int32_t kWaveformPanelWidth            = 280;
 constexpr int32_t kWaveformPanelHeight           = 90;
 constexpr int32_t kWaveformPanelX                = 0;
 constexpr int32_t kWaveformPanelY                = -21;
@@ -30,9 +30,9 @@ constexpr int32_t kWaveformBarWidth              = 1;
 constexpr int32_t kWaveformBarPitch              = 3;
 constexpr int32_t kWaveformMinBarHeight          = 2;
 constexpr int32_t kWaveformMaxBarHeight          = 86;
-constexpr size_t kWaveformBarCount               = 86;
+constexpr size_t kWaveformBarCount               = 94;
 constexpr size_t kWaveformEdgeFadeBarCount       = 3;
-constexpr size_t kLineWaveformPointCount         = 128;
+constexpr size_t kLineWaveformPointCount         = 140;
 constexpr float kLineWaveformGain                = 8.0f;
 constexpr uint32_t kBasicWaveformFrameIntervalMs = 33;
 constexpr uint32_t kLineWaveformFrameIntervalMs  = 33;
@@ -41,7 +41,7 @@ constexpr uint32_t kWaveformHistoryMs            = 3000;
 constexpr uint32_t kWaveformSampleIntervalMs     = kWaveformHistoryMs / kWaveformBarCount;
 constexpr uint32_t kLineWaveformSampleIntervalMs = kWaveformHistoryMs / kLineWaveformPointCount;
 constexpr float kWaveformGain                    = 8.0f;
-constexpr size_t kSpectrumBarCount               = 24;
+constexpr size_t kSpectrumBarCount               = 28;
 constexpr int32_t kSpectrumBarWidth              = 5;
 constexpr int32_t kSpectrumBarPitch              = 10;
 constexpr int32_t kSpectrumBarRadius             = 2;

@@ -18,7 +18,7 @@ namespace {
 
 constexpr int32_t kTitleWidth              = 230;
 constexpr int32_t kTitleY                  = 6;
-constexpr int32_t kWaveformWidth           = 256;
+constexpr int32_t kWaveformWidth           = 280;
 constexpr int32_t kWaveformHeight          = 60;
 constexpr int32_t kWaveformX               = 0;
 constexpr int32_t kWaveformY               = -23;
@@ -26,7 +26,7 @@ constexpr int32_t kWaveformBarWidth        = 1;
 constexpr int32_t kWaveformBarPitch        = 3;
 constexpr int32_t kWaveformMinBarHeight    = 2;
 constexpr int32_t kWaveformMaxBarHeight    = 56;
-constexpr size_t kWaveformVisibleBarCount  = 86;
+constexpr size_t kWaveformVisibleBarCount  = 94;
 constexpr size_t kWaveformEdgeFadeBarCount = 3;
 constexpr uint32_t kWaveformIdleColor      = 0xFFFFFF;
 constexpr uint32_t kWaveformPlayingColor   = 0x53D671;
@@ -39,9 +39,9 @@ constexpr size_t kWaveformMaxDecodedBars   = 8192;
 constexpr int32_t kPlayheadWidth           = 2;
 constexpr int32_t kPlayheadHeight          = 64;
 constexpr uint32_t kPlayheadColor          = 0x557AFF;
-constexpr int32_t kProgressBarX            = 32;
+constexpr int32_t kProgressBarX            = 20;
 constexpr int32_t kProgressBarY            = 106;
-constexpr int32_t kProgressBarWidth        = 256;
+constexpr int32_t kProgressBarWidth        = 280;
 constexpr int32_t kProgressBarHeight       = 5;
 constexpr int32_t kProgressBarRadius       = 2;
 constexpr uint32_t kProgressTrackColor     = 0x2F2F2F;
@@ -270,7 +270,7 @@ private:
             int32_t bar_h = kWaveformMinBarHeight +
                             static_cast<int32_t>(std::round(barValueForVisibleIndex(i) *
                                                             (kWaveformMaxBarHeight - kWaveformMinBarHeight)));
-            bar_h         = std::clamp(bar_h, kWaveformMinBarHeight, kWaveformMaxBarHeight);
+            bar_h = std::clamp(bar_h, kWaveformMinBarHeight, kWaveformMaxBarHeight);
 
             const int32_t x    = start_x + static_cast<int32_t>(i) * kWaveformBarPitch;
             const int32_t half = bar_h / 2;
