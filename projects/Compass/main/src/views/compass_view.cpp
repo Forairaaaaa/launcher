@@ -48,7 +48,7 @@ constexpr uint32_t kInfoNegativeBarColor     = 0xFED40D;
 constexpr float kInfoMoveDuration            = 0.5f;
 constexpr float kInfoMoveBounce              = 0.3f;
 constexpr float kInfoFadeDuration            = 0.8f;
-constexpr float kInfoFadeDelayStep           = 0.08f;
+constexpr float kInfoFadeDelayStep           = 0.07f;
 constexpr std::array<int32_t, 3> kInfoPanelY = {11, 52, 94};
 constexpr std::array<int32_t, 3> kInfoRowY   = {0, 14, 28};
 constexpr float kAccelRange                  = 10.0f;
@@ -413,9 +413,9 @@ public:
 
         _expanded = expanded;
         _x.move(_expanded ? 0.0f : static_cast<float>(kInfoPanelHiddenOffsetX));
-        _accel_panel->setExpanded(_expanded, 0.0f);
-        _gyro_panel->setExpanded(_expanded, kInfoFadeDelayStep);
-        _mag_panel->setExpanded(_expanded, kInfoFadeDelayStep * 2.0f);
+        _accel_panel->setExpanded(_expanded, kInfoFadeDelayStep);
+        _gyro_panel->setExpanded(_expanded, kInfoFadeDelayStep * 2.0f);
+        _mag_panel->setExpanded(_expanded, kInfoFadeDelayStep * 3.0f);
     }
 
     void setSample(const CompassSample& sample)
