@@ -35,6 +35,7 @@ LV_IMAGE_DECLARE(image_icon_prism_wave);
 LV_IMAGE_DECLARE(image_icon_record);
 LV_IMAGE_DECLARE(image_icon_spectrum_wave);
 LV_IMAGE_DECLARE(image_icon_stop);
+LV_IMAGE_DECLARE(image_icon_stop_small);
 LV_IMAGE_DECLARE(image_key_indicators);
 
 /* Fonts */

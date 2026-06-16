@@ -1758,7 +1758,7 @@ void RecordingView::renderState(RecordingState state)
             _key_bar->setItems({
                 {'4', waveformIcon(_view_model.waveformType().get())},
                 {'5', &image_icon_record},
-                {'6', &image_icon_stop},
+                {'6', &image_icon_stop_small},
                 {'8', &image_icon_list},
             });
             break;
