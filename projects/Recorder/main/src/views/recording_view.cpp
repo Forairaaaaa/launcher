@@ -152,17 +152,15 @@ public:
         _launchDrift  = -0.16f + unit(seed) * 0.32f;
         _burstX       = std::clamp(_launchX + _launchDrift, 0.18f, 0.82f);
         _burstY       = 0.18f + unit(seed) * 0.22f;
-        _trailBend    = -0.05f + unit(seed) * 0.10f;
         _trailColor   = nextColor(seed);
         _spark_count  = 6 + (nextSeed(seed) % 3);
 
         for (size_t i = 0; i < _spark_count; ++i) {
             Spark& spark     = _sparks[i];
             const float slot = static_cast<float>(i) / static_cast<float>(std::max<size_t>(_spark_count - 1, 1));
-            spark.angle      = -2.72f + slot * 4.9f + (-0.12f + unit(seed) * 0.24f);
+            spark.angle      = -2.72f + slot * 4.9f + (-0.06f + unit(seed) * 0.12f);
             spark.length     = 22.0f + unit(seed) * 26.0f;
-            spark.curl       = -5.0f + unit(seed) * 10.0f;
-            spark.gravity    = 6.0f + unit(seed) * 18.0f;
+            spark.gravity    = 2.0f + unit(seed) * 8.0f;
             spark.delay      = unit(seed) * 0.18f;
             spark.color      = nextColor(seed);
         }
@@ -222,13 +220,12 @@ private:
     struct Spark {
         float angle      = 0.0f;
         float length     = 24.0f;
-        float curl       = 0.0f;
         float gravity    = 10.0f;
         float delay      = 0.0f;
         lv_color_t color = lv_color_hex(0xFFFFFF);
     };
 
-    static constexpr float kDuration       = 1.15f;
+    static constexpr float kDuration       = 1.55f;
     static constexpr float kLaunchEnd      = 0.26f;
     static constexpr float kTrailFadeEnd   = 0.42f;
     static constexpr size_t kTrailSegments = 16;
@@ -244,7 +241,6 @@ private:
     float _launchDrift     = 0.0f;
     float _burstX          = 0.5f;
     float _burstY          = 0.3f;
-    float _trailBend       = 0.0f;
     lv_color_t _trailColor = lv_color_hex(0xFFFFFF);
     bool _active           = false;
 
@@ -292,9 +288,8 @@ private:
     Point trailPoint(float t) const
     {
         const float rise = easeOut(t);
-        const float sway = std::sin(t * kPrismTwoPi * 0.5f) * _trailBend;
         return {
-            _launchX + (_burstX - _launchX) * rise + sway * t * (1.0f - t),
+            _launchX + (_burstX - _launchX) * rise,
             0.96f + (_burstY - 0.96f) * rise,
         };
     }
@@ -325,16 +320,13 @@ private:
     Point sparkPoint(const Spark& spark, float t) const
     {
         const float eased = easeOut(t);
-        const float bend  = std::sin(t * kPrismTwoPi * 0.5f) * spark.curl;
         const float dx    = std::cos(spark.angle);
         const float dy    = std::sin(spark.angle);
-        const float nx    = -dy;
-        const float ny    = dx;
 
         return {
-            _burstX + (dx * spark.length * eased + nx * bend * t) / static_cast<float>(kWaveformPanelWidth),
-            _burstY + (dy * spark.length * eased + ny * bend * t + spark.gravity * easeIn(t)) /
-                          static_cast<float>(kWaveformPanelHeight),
+            _burstX + (dx * spark.length * eased) / static_cast<float>(kWaveformPanelWidth),
+            _burstY +
+                (dy * spark.length * eased + spark.gravity * easeIn(t)) / static_cast<float>(kWaveformPanelHeight),
         };
     }
 
