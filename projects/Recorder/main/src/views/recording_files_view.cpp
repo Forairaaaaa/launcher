@@ -16,10 +16,10 @@ namespace {
 
 constexpr int32_t kMenuWidth              = 320;
 constexpr int32_t kMenuHeight             = 123;
-constexpr int32_t kMenuSelectedX          = 27;
+constexpr int32_t kMenuSelectedX          = 20;
 constexpr int32_t kMenuSelectedY          = 9;
 constexpr int32_t kMenuItemMinWidth       = 82;
-constexpr int32_t kMenuItemMaxWidth       = 262;
+constexpr int32_t kMenuItemMaxWidth       = 280;
 constexpr int32_t kMenuItemHeight         = 24;
 constexpr int32_t kMenuItemPitch          = 41;
 constexpr int32_t kMenuTextPaddingLeft    = 11;
