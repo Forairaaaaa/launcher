@@ -12,8 +12,8 @@ namespace {
 constexpr ma_uint32 kToneChannels       = 2;
 constexpr ma_uint32 kToneSampleRate     = 48000;
 constexpr ma_format kToneFormat         = ma_format_f32;
-constexpr float kToneFrequency          = 1760.0f;
-constexpr float kToneGain               = 0.3f;
+constexpr float kToneFrequency          = 880.0f;
+constexpr float kToneGain               = 1.0f;
 constexpr float kToneDurationSec        = 0.045f;
 constexpr float kToneAttackSec          = 0.004f;
 constexpr float kToneReleaseSec         = 0.018f;
