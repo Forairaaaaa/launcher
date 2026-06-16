@@ -43,7 +43,7 @@ RecorderApp::RecorderApp(RecorderConfig config)
     : _config(std::move(config)),
       _recording_model(_config.recordings_dir),
       _files_model(_config.recordings_dir),
-      _recording_vm(_router, _recording_model),
+      _recording_vm(_router, _recording_model, _feedback_tone_model),
       _files_vm(_router, _files_model, _playback_model),
       _playback_vm(_router, _playback_model),
       _recording_view(_recording_vm),

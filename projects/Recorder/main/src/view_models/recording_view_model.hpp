@@ -1,5 +1,6 @@
 #pragma once
 
+#include "models/feedback_tone_model.hpp"
 #include "models/recording_model.hpp"
 #include "view_models/view_model.hpp"
 #include <string>
@@ -21,7 +22,7 @@ enum class PendingRecordingCloseAction {
 
 class RecordingViewModel : public ViewModel {
 public:
-    RecordingViewModel(RecorderRouter& router, RecordingModel& model);
+    RecordingViewModel(RecorderRouter& router, RecordingModel& model, FeedbackToneModel& feedback_tone);
 
     PageId pageId() const override
     {
@@ -78,6 +79,7 @@ public:
 
 private:
     RecordingModel& _model;
+    FeedbackToneModel& _feedback_tone;
     smooth_ui_toolkit::SingleObservable<RecordingWaveformType> _waveform_type{RecordingWaveformType::Basic};
     smooth_ui_toolkit::SingleObservable<std::string> _pending_recording_name{""};
     smooth_ui_toolkit::SingleObservable<uint32_t> _magic{0};

@@ -38,7 +38,8 @@ const char* waveformTypeName(RecordingWaveformType type)
 
 }  // namespace
 
-RecordingViewModel::RecordingViewModel(RecorderRouter& router, RecordingModel& model) : ViewModel(router), _model(model)
+RecordingViewModel::RecordingViewModel(RecorderRouter& router, RecordingModel& model, FeedbackToneModel& feedback_tone)
+    : ViewModel(router), _model(model), _feedback_tone(feedback_tone)
 {
 }
 
@@ -68,6 +69,7 @@ void RecordingViewModel::onKey(uint32_t key)
     switch (key) {
         case ' ':
             if (canGenerateMagic()) {
+                _feedback_tone.playHint();
                 ++_magic_count;
                 if (_magic_count >= 3) {
                     _magic_count = 0;

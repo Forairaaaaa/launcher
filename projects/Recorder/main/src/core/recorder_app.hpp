@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/recorder_config.hpp"
+#include "models/feedback_tone_model.hpp"
 #include "models/playback_model.hpp"
 #include "models/recording_files_model.hpp"
 #include "models/recording_model.hpp"
@@ -46,6 +47,7 @@ private:
     RecordingModel _recording_model;
     RecordingFilesModel _files_model;
     PlaybackModel _playback_model;
+    FeedbackToneModel _feedback_tone_model;
     RecordingViewModel _recording_vm;
     FilesViewModel _files_vm;
     PlaybackViewModel _playback_vm;
