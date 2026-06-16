@@ -15,6 +15,7 @@ extern "C" {
 #endif
 
 /* Images */
+LV_IMAGE_DECLARE(image_compass_dial);
 LV_IMAGE_DECLARE(image_icon_back);
 LV_IMAGE_DECLARE(image_icon_calibration);
 LV_IMAGE_DECLARE(image_icon_more);

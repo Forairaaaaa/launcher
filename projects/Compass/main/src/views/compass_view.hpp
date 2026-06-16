@@ -8,6 +8,8 @@
 
 namespace compass {
 
+class CompassDialView;
+
 class CompassView : public View {
 public:
     explicit CompassView(CompassViewModel& view_model);
@@ -20,9 +22,12 @@ public:
 private:
     CompassViewModel& _view_model;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _root;
+    std::unique_ptr<CompassDialView> _compass_dial;
     std::unique_ptr<BottomKeyBar> _key_bar;
 
+    void renderSample(const CompassSample& sample);
     void renderInfoExpanded(bool expanded);
+    static void onSampleChanged(void* context, const CompassSample& sample);
     static void onInfoExpandedChanged(void* context, const bool& expanded);
 };
 
