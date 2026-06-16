@@ -780,6 +780,8 @@ private:
             rect_dsc.bg_opa = edgeOpacity(i, _bars.size());
             lv_draw_rect(layer, &rect_dsc, &bar_area);
         }
+
+        drawMagic(layer, coords);
     }
 
     static void onDraw(lv_event_t* event)
@@ -806,6 +808,7 @@ public:
         _canvas->setBorderWidth(0);
         _canvas->setPaddingAll(0);
         _canvas->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        _panel->addEventCb(onDrawMagic, LV_EVENT_DRAW_POST, this);
         initPattern(static_cast<uint32_t>(lv_tick_get()) ^ static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this)));
         renderCanvas();
     }
@@ -1110,6 +1113,26 @@ private:
             for (int32_t dx = 0; dx < kPrismCanvasScale; ++dx) {
                 row[dx] = color;
             }
+        }
+    }
+
+    void drawMagicOverlay(lv_event_t* event)
+    {
+        lv_layer_t* layer = lv_event_get_layer(event);
+        if (!layer) {
+            return;
+        }
+
+        lv_area_t coords;
+        lv_obj_get_coords(_panel->raw_ptr(), &coords);
+        drawMagic(layer, coords);
+    }
+
+    static void onDrawMagic(lv_event_t* event)
+    {
+        auto* self = static_cast<PrismWaveformView*>(lv_event_get_user_data(event));
+        if (self) {
+            self->drawMagicOverlay(event);
         }
     }
 };

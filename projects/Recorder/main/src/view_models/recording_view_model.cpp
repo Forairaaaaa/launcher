@@ -155,10 +155,7 @@ void RecordingViewModel::syncPendingRecordingName()
 
 bool RecordingViewModel::canGenerateMagic() const
 {
-    const auto state = _model.state().get();
-    const auto type  = _waveform_type.get();
-    return state == RecordingState::Idle &&
-           (type == RecordingWaveformType::Basic || type == RecordingWaveformType::Line);
+    return _model.state().get() == RecordingState::Idle;
 }
 
 void RecordingViewModel::generateMagic()
