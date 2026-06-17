@@ -14,7 +14,7 @@ namespace compass {
 
 namespace {
 
-constexpr int32_t kCompassPanelSize          = 150;
+constexpr int32_t kCompassPanelSize          = 170;
 constexpr int32_t kCompassExpandedX          = -68;
 constexpr int32_t kLargeCrossSize            = 72;
 constexpr int32_t kSmallCrossSize            = 21;
