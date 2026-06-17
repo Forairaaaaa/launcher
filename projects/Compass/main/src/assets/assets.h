@@ -20,6 +20,8 @@ LV_IMAGE_DECLARE(image_compass_dial);
 LV_IMAGE_DECLARE(image_icon_back);
 LV_IMAGE_DECLARE(image_icon_calibration);
 LV_IMAGE_DECLARE(image_icon_more);
+LV_IMAGE_DECLARE(image_magic);
+LV_IMAGE_DECLARE(image_magic_fire);
 
 /* Fonts */
 LV_FONT_DECLARE(font_chivo_mono_medium_12);

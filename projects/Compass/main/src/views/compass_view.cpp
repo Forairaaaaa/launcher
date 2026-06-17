@@ -9,6 +9,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <random>
 
 namespace compass {
 
@@ -56,6 +57,18 @@ constexpr std::array<int32_t, 3> kInfoRowY           = {0, 14, 28};
 constexpr float kAccelRange                          = 10.0f;
 constexpr float kGyroRange                           = 1.0f;
 constexpr float kMagRange                            = 50.0f;
+constexpr int32_t kMagicPlaneSize                    = 18;
+constexpr int32_t kMagicFireSize                     = 6;
+constexpr size_t kMagicFireCount                     = 32;
+constexpr size_t kMagicPathPointCount                = 7;
+constexpr uint32_t kMagicMinDurationMs               = 2800;
+constexpr uint32_t kMagicMaxDurationMs               = 4000;
+constexpr uint32_t kMagicFireCleanupMs               = 3200;
+
+struct MagicPoint {
+    float x = 0.0f;
+    float y = 0.0f;
+};
 
 float clampNormalized(float value)
 {
@@ -430,6 +443,218 @@ private:
     }
 };
 
+class MagicView {
+public:
+    explicit MagicView(lv_obj_t* parent) : _parent(parent)
+    {
+        _plane = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Image>(parent);
+        _plane->setSrc(&image_magic);
+        _plane->setPivot(kMagicPlaneSize / 2, kMagicPlaneSize / 2);
+        _plane->setHidden(true);
+        _plane->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+
+        for (auto& fire : _fires) {
+            fire.image = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Image>(parent);
+            fire.image->setSrc(&image_magic_fire);
+            fire.image->setPivot(kMagicFireSize / 2, kMagicFireSize / 2);
+            fire.image->setHidden(true);
+            fire.image->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        }
+    }
+
+    void generate(uint32_t magic_serial)
+    {
+        if (magic_serial == 0 || !_parent || !_plane) {
+            return;
+        }
+
+        const int32_t width  = parentWidth();
+        const int32_t height = parentHeight();
+        std::mt19937 rng(0xC0FFEEu ^ (magic_serial * 0x9E3779B9u));
+        const int32_t left_max_x = std::max(62, width / 2 - 10);
+        std::uniform_int_distribution<int32_t> x_dist(24, left_max_x);
+        std::uniform_int_distribution<int32_t> y_dist(0, std::max(0, height));
+        std::uniform_int_distribution<int32_t> edge_dist(0, 2);
+        std::uniform_int_distribution<uint32_t> duration_dist(kMagicMinDurationMs, kMagicMaxDurationMs);
+        std::uniform_real_distribution<float> fire_drift_dist(-18.0f, 18.0f);
+        std::uniform_real_distribution<float> fire_speed_dist(145.0f, 220.0f);
+
+        _duration_ms                     = duration_dist(rng);
+        _start_ms                        = lv_tick_get();
+        _active                          = true;
+        const uint32_t latest_fire_start = _duration_ms > 520 ? _duration_ms - 520 : 180;
+        std::uniform_int_distribution<uint32_t> fire_time_dist(180, std::max<uint32_t>(180, latest_fire_start));
+
+        const int32_t margin = 28;
+        _path_points[0]      = offscreenPoint(edge_dist(rng), height, left_max_x, margin, rng);
+        for (size_t i = 1; i + 1 < _path_points.size(); ++i) {
+            _path_points[i] = MagicPoint{static_cast<float>(x_dist(rng)), static_cast<float>(y_dist(rng))};
+        }
+        _path_points[_path_points.size() - 1] = offscreenPoint(edge_dist(rng), height, left_max_x, margin, rng);
+
+        _plane->setRotation(0);
+        _plane->moveForeground();
+        _plane->setHidden(false);
+
+        for (size_t i = 0; i < _fires.size(); ++i) {
+            auto& fire    = _fires[i];
+            fire.start_ms = fire_time_dist(rng) + static_cast<uint32_t>((i % 3) * 28);
+            fire.origin_t =
+                std::clamp(static_cast<float>(fire.start_ms) / static_cast<float>(_duration_ms), 0.0f, 1.0f);
+            const MagicPoint origin = pointAt(fire.origin_t);
+            fire.origin_x           = origin.x + kMagicPlaneSize * 0.45f;
+            fire.origin_y           = origin.y;
+            fire.vel_x              = fire_speed_dist(rng);
+            fire.vel_y              = fire_drift_dist(rng);
+            fire.image->moveForeground();
+            fire.image->setHidden(true);
+        }
+
+        applyState(0);
+    }
+
+    void tick(uint32_t nowMs)
+    {
+        if (!_active) {
+            return;
+        }
+
+        const uint32_t elapsed = nowMs >= _start_ms ? nowMs - _start_ms : 0;
+        if (elapsed >= _duration_ms + kMagicFireCleanupMs) {
+            hide();
+            return;
+        }
+
+        applyState(elapsed);
+    }
+
+private:
+    struct Fire {
+        std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Image> image;
+        uint32_t start_ms = 0;
+        float origin_t    = 0.0f;
+        float origin_x    = 0.0f;
+        float origin_y    = 0.0f;
+        float vel_x       = 0.0f;
+        float vel_y       = 0.0f;
+    };
+
+    lv_obj_t* _parent = nullptr;
+    std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Image> _plane;
+    std::array<Fire, kMagicFireCount> _fires;
+    std::array<MagicPoint, kMagicPathPointCount> _path_points;
+    uint32_t _start_ms    = 0;
+    uint32_t _duration_ms = kMagicMinDurationMs;
+    bool _active          = false;
+
+    int32_t parentWidth() const
+    {
+        lv_obj_update_layout(_parent);
+        const int32_t width = lv_obj_get_width(_parent);
+        if (width > 0) {
+            return width;
+        }
+        auto* display = lv_display_get_default();
+        return display ? lv_display_get_horizontal_resolution(display) : 320;
+    }
+
+    int32_t parentHeight() const
+    {
+        lv_obj_update_layout(_parent);
+        const int32_t height = lv_obj_get_height(_parent);
+        if (height > 0) {
+            return height;
+        }
+        auto* display = lv_display_get_default();
+        return display ? lv_display_get_vertical_resolution(display) : 240;
+    }
+
+    static float lerp(float from, float to, float t)
+    {
+        return from + (to - from) * t;
+    }
+
+    static MagicPoint offscreenPoint(int32_t edge, int32_t height, int32_t left_max_x, int32_t margin,
+                                     std::mt19937& rng)
+    {
+        std::uniform_int_distribution<int32_t> x_dist(24, left_max_x);
+        std::uniform_int_distribution<int32_t> y_dist(0, std::max(0, height));
+
+        switch (edge) {
+            case 1:
+                return MagicPoint{static_cast<float>(x_dist(rng)), static_cast<float>(-margin)};
+            case 2:
+                return MagicPoint{static_cast<float>(x_dist(rng)), static_cast<float>(height + margin)};
+            default:
+                return MagicPoint{static_cast<float>(-margin), static_cast<float>(y_dist(rng))};
+        }
+    }
+
+    MagicPoint pointAt(float t) const
+    {
+        t                    = std::clamp(t, 0.0f, 1.0f);
+        const float scaled_t = t * static_cast<float>(_path_points.size() - 1);
+        const size_t index   = std::min(static_cast<size_t>(scaled_t), _path_points.size() - 2);
+        const float local_t  = scaled_t - static_cast<float>(index);
+        const float smooth_t = local_t * local_t * (3.0f - 2.0f * local_t);
+        return MagicPoint{
+            lerp(_path_points[index].x, _path_points[index + 1].x, smooth_t),
+            lerp(_path_points[index].y, _path_points[index + 1].y, smooth_t),
+        };
+    }
+
+    void applyState(uint32_t elapsed)
+    {
+        const int32_t width  = parentWidth();
+        const int32_t height = parentHeight();
+        const int32_t margin = 16;
+        const float t        = std::clamp(static_cast<float>(elapsed) / static_cast<float>(_duration_ms), 0.0f, 1.0f);
+        const MagicPoint plane_pos = pointAt(t);
+
+        if (elapsed <= _duration_ms) {
+            _plane->setHidden(false);
+            _plane->setPos(static_cast<int32_t>(std::round(plane_pos.x - kMagicPlaneSize / 2.0f)),
+                           static_cast<int32_t>(std::round(plane_pos.y - kMagicPlaneSize / 2.0f)));
+        } else {
+            _plane->setHidden(true);
+        }
+
+        for (auto& fire : _fires) {
+            if (!fire.image || elapsed < fire.start_ms) {
+                if (fire.image) {
+                    fire.image->setHidden(true);
+                }
+                continue;
+            }
+
+            const float fire_t = static_cast<float>(elapsed - fire.start_ms) / 1000.0f;
+            const float fire_x = fire.origin_x + fire.vel_x * fire_t;
+            const float fire_y = fire.origin_y + fire.vel_y * fire_t;
+            if (fire_x > width + margin || fire_y < -margin || fire_y > height + margin) {
+                fire.image->setHidden(true);
+                continue;
+            }
+
+            fire.image->setHidden(false);
+            fire.image->setPos(static_cast<int32_t>(std::round(fire_x - kMagicFireSize / 2.0f)),
+                               static_cast<int32_t>(std::round(fire_y - kMagicFireSize / 2.0f)));
+        }
+    }
+
+    void hide()
+    {
+        _active = false;
+        if (_plane) {
+            _plane->setHidden(true);
+        }
+        for (auto& fire : _fires) {
+            if (fire.image) {
+                fire.image->setHidden(true);
+            }
+        }
+    }
+};
+
 CompassView::CompassView(CompassViewModel& view_model) : _view_model(view_model)
 {
 }
@@ -455,9 +680,12 @@ void CompassView::onEnter(lv_obj_t* parent)
     _compass_dial = std::make_unique<CompassDialView>(_root->raw_ptr());
     _info_view    = std::make_unique<CompassInfoView>(_root->raw_ptr());
     _key_bar      = std::make_unique<BottomKeyBar>(_root->raw_ptr());
+    _magic_view   = std::make_unique<MagicView>(_root->raw_ptr());
 
+    _magic_serial_seen = _view_model.magic().get();
     _view_model.sample().observe(this, onSampleChanged);
     _view_model.infoExpanded().observe(this, onInfoExpandedChanged);
+    _view_model.magic().observe(this, onMagicChanged);
     renderSample(_view_model.sample().get());
     renderInfoExpanded(_view_model.infoExpanded().get());
 
@@ -466,8 +694,10 @@ void CompassView::onEnter(lv_obj_t* parent)
 
 void CompassView::onExit()
 {
+    _view_model.magic().removeObserver();
     _view_model.infoExpanded().removeObserver();
     _view_model.sample().removeObserver();
+    _magic_view.reset();
     _key_bar.reset();
     _info_view.reset();
     _compass_dial.reset();
@@ -485,6 +715,9 @@ void CompassView::tick(uint32_t nowMs)
     }
     if (_key_bar) {
         _key_bar->tick();
+    }
+    if (_magic_view) {
+        _magic_view->tick(nowMs);
     }
 }
 
@@ -524,6 +757,18 @@ void CompassView::renderInfoExpanded(bool expanded)
     });
 }
 
+void CompassView::renderMagic(uint32_t magic_serial)
+{
+    if (magic_serial == 0 || magic_serial == _magic_serial_seen) {
+        return;
+    }
+
+    _magic_serial_seen = magic_serial;
+    if (_magic_view) {
+        _magic_view->generate(magic_serial);
+    }
+}
+
 void CompassView::onSampleChanged(void* context, const CompassSample& sample)
 {
     auto* self = static_cast<CompassView*>(context);
@@ -537,6 +782,14 @@ void CompassView::onInfoExpandedChanged(void* context, const bool& expanded)
     auto* self = static_cast<CompassView*>(context);
     if (self) {
         self->renderInfoExpanded(expanded);
+    }
+}
+
+void CompassView::onMagicChanged(void* context, const uint32_t& magic_serial)
+{
+    auto* self = static_cast<CompassView*>(context);
+    if (self) {
+        self->renderMagic(magic_serial);
     }
 }
 

@@ -48,7 +48,7 @@ void CompassViewModel::tick(uint32_t nowMs)
 
 bool CompassViewModel::canGenerateMagic() const
 {
-    return !_info_expanded.get();
+    return true;
 }
 
 void CompassViewModel::generateMagic()
