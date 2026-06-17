@@ -11,11 +11,23 @@ void CompassViewModel::onEnter()
 {
     spdlog::info("CompassViewModel enter");
     _info_expanded.set(false);
+    _magic_count = 0;
 }
 
 void CompassViewModel::onKey(uint32_t key)
 {
     switch (key) {
+        case ' ':
+            if (canGenerateMagic()) {
+                ++_magic_count;
+                if (_magic_count >= 3) {
+                    _magic_count = 0;
+                    generateMagic();
+                }
+            } else {
+                _magic_count = 0;
+            }
+            break;
         case '7':
             if (_info_expanded.get()) {
                 _router.push(PageId::Calibration);
@@ -32,6 +44,16 @@ void CompassViewModel::onKey(uint32_t key)
 void CompassViewModel::tick(uint32_t nowMs)
 {
     _model.tick(nowMs);
+}
+
+bool CompassViewModel::canGenerateMagic() const
+{
+    return !_info_expanded.get();
+}
+
+void CompassViewModel::generateMagic()
+{
+    _magic.set(_magic.get() + 1);
 }
 
 }  // namespace compass

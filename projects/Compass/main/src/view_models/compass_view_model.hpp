@@ -28,9 +28,19 @@ public:
         return _info_expanded;
     }
 
+    smooth_ui_toolkit::SingleObservable<uint32_t>& magic()
+    {
+        return _magic;
+    }
+
 private:
     CompassModel& _model;
     smooth_ui_toolkit::SingleObservable<bool> _info_expanded{false};
+    smooth_ui_toolkit::SingleObservable<uint32_t> _magic{0};
+    uint32_t _magic_count = 0;
+
+    bool canGenerateMagic() const;
+    void generateMagic();
 };
 
 }  // namespace compass
