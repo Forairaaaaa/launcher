@@ -25,6 +25,16 @@ public:
         return _model.state();
     }
 
+    smooth_ui_toolkit::SingleObservable<std::string>& status()
+    {
+        return _model.status();
+    }
+
+    smooth_ui_toolkit::SingleObservable<float>& progress()
+    {
+        return _model.progress();
+    }
+
 private:
     CalibrationModel& _model;
     CompassModel& _compass_model;

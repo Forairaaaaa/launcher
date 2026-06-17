@@ -107,7 +107,7 @@ CalibrationModel::CalibrationModel()
 void CalibrationModel::start()
 {
     resetCapture();
-    _status.set("Move the device through all directions");
+    _status.set("Move in a figure eight");
     _progress.set(0.0f);
     _state.set(CalibrationState::Running);
 }
