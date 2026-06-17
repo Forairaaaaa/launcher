@@ -1,26 +1,8 @@
 #include "core/compass_app.hpp"
-#include "hal_lvgl_bsp.h"
 #include <lvgl.h>
 #include <spdlog/spdlog.h>
 
 namespace compass {
-
-namespace {
-
-#if LV_USE_SDL
-extern "C" uint32_t LV_C_EVENT_KEYBOARD;
-#endif
-
-lv_event_code_t keyboardEventCode()
-{
-#if LV_USE_SDL
-    return static_cast<lv_event_code_t>(LV_C_EVENT_KEYBOARD);
-#else
-    return static_cast<lv_event_code_t>(lv_c_event[CP0_C_EVENT_KEYBOARD]);
-#endif
-}
-
-}  // namespace
 
 CompassApp::CompassApp()
     : _compass_vm(_router, _compass_model),
@@ -50,9 +32,6 @@ void CompassApp::start()
     lv_obj_set_style_bg_opa(lv_screen_active(), LV_OPA_COVER, LV_PART_MAIN);
     setupInputGroup();
     _route_observer_id = _router.currentPage().observe(this, onRouteChanged);
-#if LV_USE_SDL
-    lv_obj_add_event_cb(lv_screen_active(), onKeyboardEvent, keyboardEventCode(), this);
-#endif
     setCurrentPage(_router.page());
 }
 
@@ -143,6 +122,9 @@ void CompassApp::setupInputGroup()
     while (indev) {
         if (lv_indev_get_type(indev) == LV_INDEV_TYPE_KEYPAD) {
             lv_indev_set_group(indev, _input_group);
+#if LV_USE_SDL
+            lv_indev_add_event_cb(indev, onKeyboardEvent, LV_EVENT_KEY, this);
+#endif
         }
         indev = lv_indev_get_next(indev);
     }
@@ -182,16 +164,17 @@ void CompassApp::onRouteChanged(void* context, const PageId& page)
 void CompassApp::onKeyboardEvent(lv_event_t* event)
 {
     auto* self = static_cast<CompassApp*>(lv_event_get_user_data(event));
-    auto* key  = static_cast<cp0_key_event_t*>(lv_event_get_param(event));
-    if (!self || !key) {
+    auto* indev = static_cast<lv_indev_t*>(lv_event_get_target(event));
+    if (!self || !indev || lv_indev_get_state(indev) != LV_INDEV_STATE_PRESSED) {
         return;
     }
 
-    if (key->key_state != LV_INDEV_STATE_PRESSED) {
-        return;
+    const uint32_t key = lv_indev_get_key(indev);
+    char utf8[2]       = {0, 0};
+    if (key >= 0x20 && key < 0x7f) {
+        utf8[0] = static_cast<char>(key);
     }
-
-    self->onLvglKey(key->lv_key, key->utf8);
+    self->onLvglKey(key, utf8);
 }
 
 }  // namespace compass

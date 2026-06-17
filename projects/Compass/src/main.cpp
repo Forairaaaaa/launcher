@@ -1,5 +1,5 @@
 #include "core/compass_app.hpp"
-#include "hal_lvgl_bsp.h"
+#include "hal/compass_lvgl_hal.hpp"
 #include "input/compass_keypad.hpp"
 #include <core/hal/hal.hpp>
 #include <lvgl.h>
@@ -9,8 +9,13 @@
 
 int main()
 {
+    constexpr int32_t kScreenWidth  = 320;
+    constexpr int32_t kScreenHeight = 170;
+
     lv_init();
-    cp0_lvgl_init();
+    if (!compass::initLvglHal(kScreenWidth, kScreenHeight)) {
+        return 1;
+    }
 
     lv_display_t* disp = lv_display_get_default();
     if (disp == nullptr) {
@@ -45,5 +50,6 @@ int main()
     }
 
     spdlog::info("Compass: exit requested");
+    compass::shutdownLvglHal();
     return 0;
 }

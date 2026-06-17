@@ -1,5 +1,10 @@
 [
     {
+        "url": "https://github.com/lvgl/lvgl.git",
+        "path": "dependencies/lvgl",
+        "branch": "v9.5.0"
+    },
+    {
         "url": "https://github.com/gabime/spdlog.git",
         "path": "dependencies/spdlog",
         "branch": "v1.17.0"

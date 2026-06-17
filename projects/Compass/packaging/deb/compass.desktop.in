@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Compass
+Exec=@DESKTOP_EXEC@
+Terminal=false
+Icon=share/images/@PACKAGE_ICON_NAME@
+Type=Application

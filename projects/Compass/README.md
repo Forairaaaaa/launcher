@@ -12,9 +12,25 @@ Compass app for M5Stack CardputerZero.
 
 ## Dependencies
 
-Project dependencies are pulled automatically by SCons from `repos.json` when
-missing:
+Run the bootstrap script once after cloning this repository:
 
+```bash
+./bootstrap.sh
+```
+
+It creates `.venv/`, installs the Python build tools, fetches dependencies from
+`repos.json`, and keeps all third-party source under `dependencies/`.
+
+System packages expected by the build:
+
+- CMake and a C/C++ compiler
+- SDL2 development files for `COMPASS_USE_SDL=ON`
+- `python3-venv` so `bootstrap.sh` can create `.venv/`
+- `aarch64-linux-gnu-gcc/g++` for cross-building the CardputerZero package
+
+Project dependencies pulled from `repos.json`:
+
+- `lvgl`
 - `spdlog`
 - `smooth_ui_toolkit`
 
@@ -22,11 +38,11 @@ Image asset conversion runs during build and uses LVGL's Python converter. If
 the converter dependencies are missing, install them in your Python environment:
 
 ```bash
-pip3 install pypng lz4 Pillow
+./.venv/bin/python -m pip install pypng lz4 Pillow
 ```
 
 Font conversion is not part of the normal build. If fonts are regenerated with
-`main/src/assets/convert_fonts.py`, install `lv_font_conv` separately and keep it
+`src/assets/convert_fonts.py`, install `lv_font_conv` separately and keep it
 available in `PATH`.
 
 ## Build
@@ -34,13 +50,24 @@ available in `PATH`.
 For Linux SDL testing:
 
 ```bash
-CONFIG_DEFAULT_FILE=linux_x86_sdl2_config_defaults.mk ../../.venv/bin/scons -j8
+cmake -S . -B build/sdl -DCOMPASS_USE_SDL=ON
+cmake --build build/sdl -j8
 ```
 
-For CardputerZero cross build:
+For CardputerZero framebuffer build:
 
 ```bash
-CONFIG_DEFAULT_FILE=linux_x86_cross_cp0_config_defaults.mk ../../.venv/bin/scons -j8
+cmake -S . -B build/cp0 -DCOMPASS_USE_SDL=OFF
+cmake --build build/cp0 -j8
+```
+
+For cross build from x86 Linux with the GNU aarch64 toolchain:
+
+```bash
+cmake -S . -B build/cp0 \
+  -DCOMPASS_USE_SDL=OFF \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/aarch64-linux-gnu.cmake
+cmake --build build/cp0 -j8
 ```
 
 The output binary is `dist/M5CardputerZero-Compass`.
@@ -74,7 +101,7 @@ Key controls:
 Build the CardputerZero Debian package:
 
 ```bash
-./package_deb.sh
+./packaging/deb/package_deb.sh
 ```
 
 The generated package is written to `dist/`:
