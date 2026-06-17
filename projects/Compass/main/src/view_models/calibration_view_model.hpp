@@ -1,13 +1,14 @@
 #pragma once
 
 #include "models/calibration_model.hpp"
+#include "models/compass_model.hpp"
 #include "view_models/view_model.hpp"
 
 namespace compass {
 
 class CalibrationViewModel : public ViewModel {
 public:
-    CalibrationViewModel(CompassRouter& router, CalibrationModel& model);
+    CalibrationViewModel(CompassRouter& router, CalibrationModel& model, CompassModel& compass_model);
 
     PageId pageId() const override
     {
@@ -26,6 +27,7 @@ public:
 
 private:
     CalibrationModel& _model;
+    CompassModel& _compass_model;
 };
 
 }  // namespace compass

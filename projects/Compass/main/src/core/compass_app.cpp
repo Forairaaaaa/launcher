@@ -24,7 +24,7 @@ lv_event_code_t keyboardEventCode()
 
 CompassApp::CompassApp()
     : _compass_vm(_router, _compass_model),
-      _calibration_vm(_router, _calibration_model),
+      _calibration_vm(_router, _calibration_model, _compass_model),
       _compass_view(_compass_vm),
       _calibration_view(_calibration_vm),
       _view_models{&_compass_vm, &_calibration_vm},

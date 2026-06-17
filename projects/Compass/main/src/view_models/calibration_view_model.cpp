@@ -3,8 +3,8 @@
 
 namespace compass {
 
-CalibrationViewModel::CalibrationViewModel(CompassRouter& router, CalibrationModel& model)
-    : ViewModel(router), _model(model)
+CalibrationViewModel::CalibrationViewModel(CompassRouter& router, CalibrationModel& model, CompassModel& compass_model)
+    : ViewModel(router), _model(model), _compass_model(compass_model)
 {
 }
 
@@ -28,7 +28,13 @@ void CalibrationViewModel::onKey(uint32_t key)
         case '6':
         case '\r':
         case '\n':
-            _model.start();
+            if (_model.state().get() == CalibrationState::Running) {
+                if (_model.finish()) {
+                    _compass_model.reloadCalibration();
+                }
+            } else {
+                _model.start();
+            }
             break;
         default:
             break;
@@ -37,7 +43,13 @@ void CalibrationViewModel::onKey(uint32_t key)
 
 void CalibrationViewModel::tick(uint32_t nowMs)
 {
+    _compass_model.tick(nowMs);
+    _model.updateSample(_compass_model.sample().get());
+    const auto previous_state = _model.state().get();
     _model.tick(nowMs);
+    if (previous_state == CalibrationState::Running && _model.state().get() == CalibrationState::Done) {
+        _compass_model.reloadCalibration();
+    }
 }
 
 }  // namespace compass

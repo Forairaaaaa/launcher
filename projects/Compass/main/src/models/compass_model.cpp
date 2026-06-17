@@ -1,4 +1,5 @@
 #include "models/compass_model.hpp"
+#include "models/calibration_model.hpp"
 #include <spdlog/spdlog.h>
 #include <algorithm>
 #include <cctype>
@@ -303,6 +304,7 @@ public:
         sample.mag.x          = std::cos(heading * kDegToRad) * 42.0f;
         sample.mag.y          = -std::sin(heading * kDegToRad) * 42.0f;
         sample.mag.z          = 5.0f + std::sin(t * 0.42f) * 2.0f;
+        sample.rawMag         = sample.mag;
         return true;
     }
 };
@@ -377,6 +379,7 @@ public:
             return false;
         }
 
+        sample.rawMag = sample.mag;
         fillPose(sample);
         return true;
     }
@@ -403,6 +406,7 @@ struct CompassModel::Impl {
     std::unique_ptr<ImuBackend> backend = makePrimaryBackend();
     uint32_t last_sample_ms             = 0;
     bool using_mock                     = false;
+    CompassCalibration calibration;
 
     Impl()
     {
@@ -413,6 +417,8 @@ struct CompassModel::Impl {
 
     bool init()
     {
+        loadCalibration();
+
         std::string error;
         if (backend && backend->init(error)) {
             spdlog::info("CompassModel: using {} backend", using_mock ? "mock" : "IIO");
@@ -430,6 +436,20 @@ struct CompassModel::Impl {
         backend    = std::make_unique<MockImuBackend>();
         spdlog::info("CompassModel: fallback backend active: {}", reason);
     }
+
+    bool loadCalibration()
+    {
+        CompassCalibration next;
+        if (CalibrationModel::load(next)) {
+            calibration = next;
+            spdlog::info("CompassModel: calibration loaded from {}", CalibrationModel::configPath().string());
+            return true;
+        }
+
+        calibration = CompassCalibration{};
+        spdlog::info("CompassModel: no calibration file at {}", CalibrationModel::configPath().string());
+        return false;
+    }
 };
 
 CompassModel::CompassModel() : _impl(std::make_unique<Impl>())
@@ -438,6 +458,11 @@ CompassModel::CompassModel() : _impl(std::make_unique<Impl>())
 }
 
 CompassModel::~CompassModel() = default;
+
+bool CompassModel::reloadCalibration()
+{
+    return _impl->loadCalibration();
+}
 
 void CompassModel::tick(uint32_t nowMs)
 {
@@ -457,6 +482,15 @@ void CompassModel::tick(uint32_t nowMs)
             next.available = false;
             next.status    = error.empty() ? "No IMU data" : error;
         }
+    }
+
+    if (next.available && next.rawMag.x == 0.0f && next.rawMag.y == 0.0f && next.rawMag.z == 0.0f) {
+        next.rawMag = next.mag;
+    }
+
+    if (next.available && next.source == CompassDataSource::Iio) {
+        next.mag = applyMagCalibration(next.mag, _impl->calibration);
+        fillPose(next);
     }
 
     _sample.set(std::move(next));

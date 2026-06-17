@@ -30,6 +30,7 @@ struct CompassSample {
     Axis3 accel;
     Axis3 gyro;
     Axis3 mag;
+    Axis3 rawMag;
 };
 
 class CompassModel {
@@ -46,6 +47,7 @@ public:
     }
 
     void tick(uint32_t nowMs);
+    bool reloadCalibration();
 
 private:
     struct Impl;
