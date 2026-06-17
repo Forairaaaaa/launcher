@@ -28,16 +28,15 @@ IMAGE_FORMAT_BY_EXT = {
 
 def repo_root() -> Path:
     for parent in [ASSETS_DIR, *ASSETS_DIR.parents]:
-        script = parent / "SDK" / "github_source" / "lvgl" / \
-            "lvgl_9_5" / "lvgl" / "scripts" / "LVGLImage.py"
+        script = parent / "dependencies" / "lvgl" / "scripts" / "LVGLImage.py"
         if script.exists():
             return parent
     raise FileNotFoundError(
-        "Cannot find LVGLImage.py under SDK/github_source/lvgl/lvgl_9_5/lvgl/scripts")
+        "Cannot find LVGLImage.py under dependencies/lvgl/scripts. Run ./bootstrap.sh first.")
 
 
 def lvgl_image_script() -> Path:
-    return repo_root() / "SDK" / "github_source" / "lvgl" / "lvgl_9_5" / "lvgl" / "scripts" / "LVGLImage.py"
+    return repo_root() / "dependencies" / "lvgl" / "scripts" / "LVGLImage.py"
 
 
 def load_lvgl_image_module():

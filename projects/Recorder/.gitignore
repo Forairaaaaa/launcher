@@ -1,7 +1,8 @@
 build/
 dist/
 dependencies/
+.venv/
 __pycache__
 recordings/
 .DS_Store
-main/src/assets/res_c/image_*.c
+src/assets/res_c/image_*.c

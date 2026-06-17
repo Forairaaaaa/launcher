@@ -1,5 +1,6 @@
-import subprocess
 import json
+import os
+import subprocess
 from pathlib import Path
 
 
@@ -21,14 +22,12 @@ def clone_or_update_repo(
             check=True,
         )
 
-    # 应用 patch
     if patch_path:
         patch_full_path = (
             patch_path
             if os.path.isabs(patch_path)
             else str(Path.cwd() / patch_path)
         )
-        # 使用 git apply --check 先检测补丁是否能应用，避免报错
         check_result = subprocess.run(
             ["git", "-C", path, "apply", "--check", patch_full_path]
         )

@@ -1,6 +1,6 @@
 #include "core/recorder_app.hpp"
 #include "core/recorder_config.hpp"
-#include "hal_lvgl_bsp.h"
+#include "hal/recorder_lvgl_hal.hpp"
 #include "input/recorder_keypad.hpp"
 #include <core/hal/hal.hpp>
 #include <stdio.h>
@@ -10,6 +10,9 @@
 #include <spdlog/spdlog.h>
 
 namespace {
+
+constexpr int32_t kScreenWidth  = 320;
+constexpr int32_t kScreenHeight = 170;
 
 void printUsage(const char* program)
 {
@@ -57,7 +60,10 @@ int main(int argc, char* argv[])
     }
 
     lv_init();
-    cp0_lvgl_init();
+    if (!recorder::initLvglHal(kScreenWidth, kScreenHeight)) {
+        fprintf(stderr, "Recorder: failed to initialize LVGL HAL\n");
+        return 1;
+    }
 
     lv_display_t* disp = lv_display_get_default();
     if (disp == nullptr) {
@@ -93,5 +99,6 @@ int main(int argc, char* argv[])
     }
 
     spdlog::info("Recorder: exit requested");
+    recorder::shutdownLvglHal();
     return 0;
 }
