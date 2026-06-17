@@ -14,42 +14,48 @@ namespace compass {
 
 namespace {
 
-constexpr int32_t kCompassPanelSize          = 170;
-constexpr int32_t kCompassExpandedX          = -68;
-constexpr int32_t kLargeCrossSize            = 72;
-constexpr int32_t kSmallCrossSize            = 21;
-constexpr int32_t kCrossThickness            = 1;
-constexpr int32_t kBubbleMinSize             = 43;
-constexpr int32_t kBubbleMaxSize             = 53;
-constexpr int32_t kBubbleTravel              = 26;
-constexpr uint32_t kCrossColor               = 0x8C8C8C;
-constexpr uint32_t kBubbleColor              = 0x303030;
-constexpr float kGravityMetersPerSecond      = 9.81f;
-constexpr float kCompassUnavailableHeading   = 0.0f;
-constexpr float kCompassUnavailableBubblePos = 0.0f;
-constexpr float kCompassUnavailableBubbleZ   = 1.0f;
-constexpr int32_t kInfoPanelX                = 184;
-constexpr int32_t kInfoPanelHiddenOffsetX    = 150;
-constexpr int32_t kInfoPanelWidth            = 124;
-constexpr int32_t kInfoPanelHeight           = 38;
-constexpr int32_t kInfoSidebarWidth          = 3;
-constexpr int32_t kInfoSidebarRadius         = 1;
-constexpr int32_t kInfoLabelX                = 10;
-constexpr int32_t kInfoLabelWidth            = 54;
-constexpr int32_t kInfoLabelHeight           = 12;
-constexpr int32_t kInfoBarX                  = 67;
-constexpr int32_t kInfoBarMaxWidth           = 56;
-constexpr int32_t kInfoBarHeight             = 6;
-constexpr int32_t kInfoBarRadius             = 1;
-constexpr uint32_t kInfoSidebarColor         = 0x4C4C4C;
-constexpr uint32_t kInfoTextColor            = 0xF2F2F2;
-constexpr uint32_t kInfoPositiveBarColor     = 0x53D671;
-constexpr uint32_t kInfoNegativeBarColor     = 0xFED40D;
-constexpr std::array<int32_t, 3> kInfoPanelY = {11, 52, 94};
-constexpr std::array<int32_t, 3> kInfoRowY   = {0, 14, 28};
-constexpr float kAccelRange                  = 10.0f;
-constexpr float kGyroRange                   = 1.0f;
-constexpr float kMagRange                    = 50.0f;
+constexpr int32_t kCompassPanelSize                  = 170;
+constexpr int32_t kCompassExpandedX                  = -68;
+constexpr int32_t kDirectionLabelRadius              = 50;
+constexpr int32_t kDirectionLabelWidth               = 14;
+constexpr int32_t kDirectionLabelHeight              = 12;
+constexpr int32_t kLargeCrossSize                    = 72;
+constexpr int32_t kSmallCrossSize                    = 21;
+constexpr int32_t kCrossThickness                    = 1;
+constexpr int32_t kBubbleMinSize                     = 43;
+constexpr int32_t kBubbleMaxSize                     = 53;
+constexpr int32_t kBubbleTravel                      = 26;
+constexpr uint32_t kCrossColor                       = 0x5D5D5D;
+constexpr uint32_t kDirectionLabelColor              = 0xFFFFFF;
+constexpr uint32_t kBubbleColor                      = 0x1F1F1F;
+constexpr float kGravityMetersPerSecond              = 9.81f;
+constexpr float kCompassUnavailableHeading           = 0.0f;
+constexpr float kCompassUnavailableBubblePos         = 0.0f;
+constexpr float kCompassUnavailableBubbleZ           = 1.0f;
+constexpr int32_t kInfoPanelX                        = 184;
+constexpr int32_t kInfoPanelHiddenOffsetX            = 150;
+constexpr int32_t kInfoPanelWidth                    = 124;
+constexpr int32_t kInfoPanelHeight                   = 38;
+constexpr int32_t kInfoSidebarWidth                  = 3;
+constexpr int32_t kInfoSidebarRadius                 = 1;
+constexpr int32_t kInfoLabelX                        = 10;
+constexpr int32_t kInfoLabelWidth                    = 54;
+constexpr int32_t kInfoLabelHeight                   = 12;
+constexpr int32_t kInfoBarX                          = 67;
+constexpr int32_t kInfoBarMaxWidth                   = 56;
+constexpr int32_t kInfoBarHeight                     = 6;
+constexpr int32_t kInfoBarRadius                     = 1;
+constexpr uint32_t kInfoSidebarColor                 = 0x4C4C4C;
+constexpr uint32_t kInfoTextColor                    = 0xF2F2F2;
+constexpr uint32_t kInfoPositiveBarColor             = 0x53D671;
+constexpr uint32_t kInfoNegativeBarColor             = 0xFED40D;
+constexpr std::array<const char*, 4> kDirectionTexts = {"N", "E", "S", "W"};
+constexpr std::array<float, 4> kDirectionAngles      = {0.0f, 90.0f, 180.0f, 270.0f};
+constexpr std::array<int32_t, 3> kInfoPanelY         = {11, 52, 94};
+constexpr std::array<int32_t, 3> kInfoRowY           = {0, 14, 28};
+constexpr float kAccelRange                          = 10.0f;
+constexpr float kGyroRange                           = 1.0f;
+constexpr float kMagRange                            = 50.0f;
 
 float clampNormalized(float value)
 {
@@ -113,6 +119,16 @@ public:
         _dial->setSrc(&image_compass_dial);
         _dial->setPivot(kCompassPanelSize / 2, kCompassPanelSize / 2);
         _dial->align(LV_ALIGN_CENTER, 0, 0);
+
+        for (size_t i = 0; i < _direction_labels.size(); ++i) {
+            _direction_labels[i] = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Label>(_panel->raw_ptr());
+            _direction_labels[i]->setText(kDirectionTexts[i]);
+            _direction_labels[i]->setTextFont(&font_chivo_mono_medium_12);
+            _direction_labels[i]->setTextColor(lv_color_hex(kDirectionLabelColor));
+            _direction_labels[i]->setTextAlign(LV_TEXT_ALIGN_CENTER);
+            _direction_labels[i]->setSize(kDirectionLabelWidth, kDirectionLabelHeight);
+            _direction_labels[i]->removeFlag(LV_OBJ_FLAG_SCROLLABLE);
+        }
 
         _ball = std::make_unique<smooth_ui_toolkit::lvgl_cpp::Container>(_panel->raw_ptr());
         _ball->setBgColor(lv_color_hex(kBubbleColor));
@@ -182,6 +198,7 @@ public:
 private:
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _panel;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Image> _dial;
+    std::array<std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Label>, 4> _direction_labels;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _large_cross_horizontal;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _large_cross_vertical;
     std::unique_ptr<smooth_ui_toolkit::lvgl_cpp::Container> _ball;
@@ -205,6 +222,7 @@ private:
 
         const float heading = _heading.directValue();
         _dial->setRotation(static_cast<int32_t>(std::round(-heading * 10.0f)));
+        applyDirectionLabels(heading);
 
         const float bubble_size_value = clampZeroToOne(_bubble_size.directValue());
         const int32_t ball_size =
@@ -218,6 +236,22 @@ private:
         _ball->align(LV_ALIGN_CENTER, offset_x, offset_y);
         _small_cross_horizontal->align(LV_ALIGN_CENTER, offset_x, offset_y);
         _small_cross_vertical->align(LV_ALIGN_CENTER, offset_x, offset_y);
+    }
+
+    void applyDirectionLabels(float heading)
+    {
+        constexpr float kDegreesToRadians = 3.14159265358979323846f / 180.0f;
+
+        for (size_t i = 0; i < _direction_labels.size(); ++i) {
+            if (!_direction_labels[i]) {
+                continue;
+            }
+
+            const float angle = (kDirectionAngles[i] - heading) * kDegreesToRadians;
+            const int32_t x   = static_cast<int32_t>(std::round(std::sin(angle) * kDirectionLabelRadius));
+            const int32_t y   = static_cast<int32_t>(std::round(-std::cos(angle) * kDirectionLabelRadius));
+            _direction_labels[i]->align(LV_ALIGN_CENTER, x, y);
+        }
     }
 
     void setupLine(smooth_ui_toolkit::lvgl_cpp::Container& line, int32_t width, int32_t height)
