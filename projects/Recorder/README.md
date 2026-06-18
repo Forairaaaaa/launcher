@@ -29,6 +29,15 @@ System packages expected by the build:
 - `python3-venv` so `bootstrap.sh` can create `.venv/`
 - `aarch64-linux-gnu-gcc/g++` for cross-building the CardputerZero package
 
+On macOS, install the desktop build tools with Homebrew:
+
+```bash
+brew install cmake pkg-config sdl2
+```
+
+macOS supports the SDL desktop build only. Device framebuffer and Debian
+packaging are Linux/CardputerZero targets.
+
 Project dependencies pulled from `repos.json`:
 
 - `lvgl`
@@ -54,6 +63,13 @@ For Linux SDL testing:
 ```bash
 cmake -S . -B build/sdl -DRECORDER_USE_SDL=ON
 cmake --build build/sdl -j8
+```
+
+For macOS SDL testing:
+
+```bash
+cmake -S . -B build/macos-sdl -DRECORDER_USE_SDL=ON
+cmake --build build/macos-sdl -j8
 ```
 
 For CardputerZero framebuffer build:
@@ -99,11 +115,14 @@ Key controls:
 
 ## Package
 
-Build the CardputerZero Debian package:
+Build the cp0/CardputerZero Debian package:
 
 ```bash
 ./packaging/deb/package_deb.sh
 ```
+
+The package script is device-targeted only. It always configures the framebuffer
+build with PulseAudio and produces an `arm64` APPLaunch package.
 
 The generated package is written to `dist/`:
 

@@ -4,9 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 PACKAGE_NAME="${PACKAGE_NAME:-m5cardputerzero-recorder}"
-PACKAGE_VERSION="${PACKAGE_VERSION:-0.1.0}"
 PACKAGE_SUFFIX="${PACKAGE_SUFFIX:-m5stack1}"
-DEB_ARCH="${DEB_ARCH:-arm64}"
+DEB_ARCH="arm64"
 MAINTAINER="${MAINTAINER:-m5stack <m5stack@m5stack.com>}"
 PARALLEL="${PARALLEL:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build/package}"
@@ -28,24 +27,52 @@ if ! command -v "${CMAKE_BIN}" >/dev/null 2>&1; then
     exit 1
 fi
 
+read_cmake_cache_value() {
+    local name="$1"
+    local cache_file="${BUILD_DIR}/CMakeCache.txt"
+    local line=""
+
+    if [[ ! -f "${cache_file}" ]]; then
+        echo "CMake cache not found: ${cache_file}" >&2
+        return 1
+    fi
+
+    line="$(grep -E "^${name}(:[^=]*)?=" "${cache_file}" | tail -n 1 || true)"
+    if [[ -z "${line}" ]]; then
+        echo "CMake cache value not found: ${name}" >&2
+        return 1
+    fi
+
+    printf "%s\n" "${line#*=}"
+}
+
 CMAKE_CONFIGURE_ARGS=(
     -S "${ROOT_DIR}"
     -B "${BUILD_DIR}"
+    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
     -DRECORDER_USE_SDL=OFF
     -DRECORDER_USE_PULSEAUDIO=ON
-    -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
 )
 
-if [[ -z "${CMAKE_TOOLCHAIN_FILE:-}" && "${DEB_ARCH}" == "arm64" ]]; then
-    host_arch="$(uname -m)"
-    if [[ "${host_arch}" != "aarch64" && "${host_arch}" != "arm64" && -x "$(command -v aarch64-linux-gnu-gcc || true)" ]]; then
-        CMAKE_CONFIGURE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE="${ROOT_DIR}/cmake/aarch64-linux-gnu.cmake")
+host_arch="$(uname -m)"
+if [[ "${host_arch}" != "aarch64" && "${host_arch}" != "arm64" ]]; then
+    if [[ ! -x "$(command -v aarch64-linux-gnu-gcc || true)" || ! -x "$(command -v aarch64-linux-gnu-g++ || true)" ]]; then
+        echo "aarch64-linux-gnu-gcc/g++ not found. Install the GNU aarch64 toolchain for cp0 packaging." >&2
+        exit 1
     fi
-elif [[ -n "${CMAKE_TOOLCHAIN_FILE:-}" ]]; then
-    CMAKE_CONFIGURE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE}")
+    CMAKE_CONFIGURE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE="${ROOT_DIR}/cmake/aarch64-linux-gnu.cmake")
 fi
 
-"${CMAKE_BIN}" "${CMAKE_CONFIGURE_ARGS[@]}" ${EXTRA_CMAKE_ARGS:-}
+"${CMAKE_BIN}" "${CMAKE_CONFIGURE_ARGS[@]}"
+if [[ "$(read_cmake_cache_value RECORDER_USE_SDL)" != "OFF" ]]; then
+    echo "Invalid package build: RECORDER_USE_SDL must be OFF for cp0 packaging." >&2
+    exit 1
+fi
+if [[ "$(read_cmake_cache_value RECORDER_USE_PULSEAUDIO)" != "ON" ]]; then
+    echo "Invalid package build: RECORDER_USE_PULSEAUDIO must be ON for cp0 packaging." >&2
+    exit 1
+fi
+PACKAGE_VERSION="$(read_cmake_cache_value CMAKE_PROJECT_VERSION)"
 "${CMAKE_BIN}" --build "${BUILD_DIR}" -j"${PARALLEL}"
 
 EXECUTABLE="${ROOT_DIR}/dist/${BIN_NAME}"

@@ -1,10 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(M5CardputerZeroCompass LANGUAGES C CXX ASM)
+project(M5CardputerZeroCompass VERSION 0.1.0 LANGUAGES C CXX ASM)
 
 option(COMPASS_USE_SDL "Use LVGL's SDL backend for desktop testing" ON)
 option(COMPASS_CONVERT_ASSETS "Convert image assets during CMake configure" ON)
 set(COMPASS_BIN_NAME "M5CardputerZero-Compass" CACHE STRING "Output executable name")
+
+if(APPLE AND NOT COMPASS_USE_SDL)
+    message(FATAL_ERROR "macOS builds only support COMPASS_USE_SDL=ON.")
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,6 +21,15 @@ set(COMPASS_DEPS_DIR "${COMPASS_ROOT}/dependencies")
 set(COMPASS_LVGL_DIR "${COMPASS_DEPS_DIR}/lvgl")
 set(COMPASS_SPDLOG_DIR "${COMPASS_DEPS_DIR}/spdlog")
 set(COMPASS_SMOOTH_UI_DIR "${COMPASS_DEPS_DIR}/smooth_ui_toolkit")
+set(COMPASS_SYSTEM_LIBS ${CMAKE_DL_LIBS})
+
+if(UNIX AND NOT APPLE)
+    list(APPEND COMPASS_SYSTEM_LIBS m)
+endif()
+
+if(APPLE)
+    list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew" "/usr/local")
+endif()
 
 if(NOT DEFINED Python3_EXECUTABLE AND EXISTS "${COMPASS_ROOT}/.venv/bin/python")
     set(Python3_EXECUTABLE "${COMPASS_ROOT}/.venv/bin/python")
@@ -71,18 +84,22 @@ target_compile_definitions(lvgl PUBLIC
 if(COMPASS_USE_SDL)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
-        pkg_check_modules(SDL2 QUIET sdl2)
+        pkg_check_modules(SDL2 QUIET IMPORTED_TARGET sdl2)
     endif()
 
     if(SDL2_FOUND)
-        target_include_directories(lvgl SYSTEM PRIVATE ${SDL2_INCLUDE_DIRS})
-        target_compile_options(lvgl PRIVATE ${SDL2_CFLAGS_OTHER})
-        target_link_directories(lvgl PUBLIC ${SDL2_LIBRARY_DIRS})
-        set(COMPASS_SDL_LIBS ${SDL2_LIBRARIES})
+        target_link_libraries(lvgl PRIVATE PkgConfig::SDL2)
+        set(COMPASS_SDL_LIBS PkgConfig::SDL2)
     else()
-        find_package(SDL2 REQUIRED)
-        target_include_directories(lvgl SYSTEM PRIVATE ${SDL2_INCLUDE_DIRS})
-        set(COMPASS_SDL_LIBS ${SDL2_LIBRARIES})
+        find_package(SDL2 CONFIG QUIET)
+        if(TARGET SDL2::SDL2)
+            target_link_libraries(lvgl PRIVATE SDL2::SDL2)
+            set(COMPASS_SDL_LIBS SDL2::SDL2)
+        else()
+            find_package(SDL2 REQUIRED)
+            target_include_directories(lvgl SYSTEM PRIVATE ${SDL2_INCLUDE_DIRS})
+            set(COMPASS_SDL_LIBS ${SDL2_LIBRARIES})
+        endif()
     endif()
 endif()
 
@@ -120,6 +137,7 @@ target_link_libraries(${COMPASS_BIN_NAME} PRIVATE
     spdlog::spdlog
     Threads::Threads
     ${COMPASS_SDL_LIBS}
+    ${COMPASS_SYSTEM_LIBS}
 )
 
 set_target_properties(${COMPASS_BIN_NAME} PROPERTIES

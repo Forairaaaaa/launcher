@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(M5CardputerZeroRecorder LANGUAGES C CXX ASM)
+project(M5CardputerZeroRecorder VERSION 0.1.0 LANGUAGES C CXX ASM)
 
 option(RECORDER_USE_SDL "Use LVGL's SDL backend for desktop testing" ON)
 option(RECORDER_CONVERT_ASSETS "Convert image assets during CMake configure" ON)
@@ -12,6 +12,10 @@ if(NOT DEFINED RECORDER_USE_PULSEAUDIO)
     else()
         set(RECORDER_USE_PULSEAUDIO ON)
     endif()
+endif()
+
+if(APPLE AND NOT RECORDER_USE_SDL)
+    message(FATAL_ERROR "macOS builds only support RECORDER_USE_SDL=ON.")
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -26,6 +30,15 @@ set(RECORDER_LVGL_DIR "${RECORDER_DEPS_DIR}/lvgl")
 set(RECORDER_SPDLOG_DIR "${RECORDER_DEPS_DIR}/spdlog")
 set(RECORDER_SMOOTH_UI_DIR "${RECORDER_DEPS_DIR}/smooth_ui_toolkit")
 set(RECORDER_MINIAUDIO_DIR "${RECORDER_DEPS_DIR}/miniaudio")
+set(RECORDER_SYSTEM_LIBS ${CMAKE_DL_LIBS})
+
+if(UNIX AND NOT APPLE)
+    list(APPEND RECORDER_SYSTEM_LIBS m)
+endif()
+
+if(APPLE)
+    list(APPEND CMAKE_PREFIX_PATH "/opt/homebrew" "/usr/local")
+endif()
 
 if(NOT DEFINED Python3_EXECUTABLE)
     foreach(candidate IN ITEMS "${RECORDER_ROOT}/.venv/bin/python" "${RECORDER_ROOT}/../../.venv/bin/python")
@@ -93,18 +106,22 @@ target_compile_definitions(lvgl PUBLIC
 if(RECORDER_USE_SDL)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
-        pkg_check_modules(SDL2 QUIET sdl2)
+        pkg_check_modules(SDL2 QUIET IMPORTED_TARGET sdl2)
     endif()
 
     if(SDL2_FOUND)
-        target_include_directories(lvgl SYSTEM PRIVATE ${SDL2_INCLUDE_DIRS})
-        target_compile_options(lvgl PRIVATE ${SDL2_CFLAGS_OTHER})
-        target_link_directories(lvgl PUBLIC ${SDL2_LIBRARY_DIRS})
-        set(RECORDER_SDL_LIBS ${SDL2_LIBRARIES})
+        target_link_libraries(lvgl PRIVATE PkgConfig::SDL2)
+        set(RECORDER_SDL_LIBS PkgConfig::SDL2)
     else()
-        find_package(SDL2 REQUIRED)
-        target_include_directories(lvgl SYSTEM PRIVATE ${SDL2_INCLUDE_DIRS})
-        set(RECORDER_SDL_LIBS ${SDL2_LIBRARIES})
+        find_package(SDL2 CONFIG QUIET)
+        if(TARGET SDL2::SDL2)
+            target_link_libraries(lvgl PRIVATE SDL2::SDL2)
+            set(RECORDER_SDL_LIBS SDL2::SDL2)
+        else()
+            find_package(SDL2 REQUIRED)
+            target_include_directories(lvgl SYSTEM PRIVATE ${SDL2_INCLUDE_DIRS})
+            set(RECORDER_SDL_LIBS ${SDL2_LIBRARIES})
+        endif()
     endif()
 endif()
 
@@ -142,8 +159,7 @@ target_link_libraries(${RECORDER_BIN_NAME} PRIVATE
     spdlog::spdlog
     Threads::Threads
     ${RECORDER_SDL_LIBS}
-    dl
-    m
+    ${RECORDER_SYSTEM_LIBS}
 )
 
 set_target_properties(${RECORDER_BIN_NAME} PROPERTIES
